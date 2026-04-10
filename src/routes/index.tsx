@@ -7,6 +7,8 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { AppointmentsPage } from '@/features/appointments/pages/AppointmentsPage';
 import { PatientsPage } from '@/features/patients/pages/PatientsPage';
 import { BillingPage } from '@/features/billing/pages/BillingPage';
+import { ReportsPage } from '@/features/reports/pages/ReportsPage';
+import { StaffPage } from '@/features/staff/pages/StaffPage';
 import { ComingSoonPage } from '@/components/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -31,8 +33,8 @@ export const router = createBrowserRouter([
           { path: '/patients',     element: <PatientsPage /> },
           { path: '/treatments',   element: <ComingSoonPage title="Treatments" /> },
           { path: '/billing',      element: <BillingPage /> },
-          { path: '/reports',      element: <ComingSoonPage title="Reports" /> },
-          { path: '/staff',        element: <ComingSoonPage title="Staff" /> },
+          { path: '/reports',      element: <ReportsPage /> },
+          { path: '/staff',        element: <StaffPage /> },
           { path: '/settings',     element: <ComingSoonPage title="Settings" /> },
         ],
       },
