@@ -4,6 +4,9 @@ import { AppLayout } from '@/layouts/AppLayout';
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
+import { AppointmentsPage } from '@/features/appointments/pages/AppointmentsPage';
+import { PatientsPage } from '@/features/patients/pages/PatientsPage';
+import { BillingPage } from '@/features/billing/pages/BillingPage';
 import { ComingSoonPage } from '@/components/shared/ComingSoonPage';
 
 export const router = createBrowserRouter([
@@ -24,10 +27,10 @@ export const router = createBrowserRouter([
         children: [
           { path: '/',             element: <Navigate to="/dashboard" replace /> },
           { path: '/dashboard',    element: <DashboardPage /> },
-          { path: '/appointments', element: <ComingSoonPage title="Appointments" /> },
-          { path: '/patients',     element: <ComingSoonPage title="Patients" /> },
+          { path: '/appointments', element: <AppointmentsPage /> },
+          { path: '/patients',     element: <PatientsPage /> },
           { path: '/treatments',   element: <ComingSoonPage title="Treatments" /> },
-          { path: '/billing',      element: <ComingSoonPage title="Billing" /> },
+          { path: '/billing',      element: <BillingPage /> },
           { path: '/reports',      element: <ComingSoonPage title="Reports" /> },
           { path: '/staff',        element: <ComingSoonPage title="Staff" /> },
           { path: '/settings',     element: <ComingSoonPage title="Settings" /> },
