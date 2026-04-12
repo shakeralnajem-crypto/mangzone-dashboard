@@ -12,6 +12,7 @@ const db = supabase as any;
 type AppointmentWithRelations = Appointment & {
   patient: { first_name: string; last_name: string; phone?: string | null } | null;
   doctor: { full_name: string } | null;
+  doctor_ref: { full_name: string } | null;
   service: { name: string } | null;
 };
 
@@ -28,13 +29,14 @@ export function useAppointments(filters?: { search?: string; doctorId?: string; 
           *,
           patient:patients(first_name, last_name, phone),
           doctor:profiles!appointments_doctor_id_fkey(full_name),
+          doctor_ref:doctors!appointments_doctor_ref_id_fkey(full_name),
           service:services(name)
         `)
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
         .order('start_time', { ascending: false });
 
-      if (filters?.doctorId) q = q.eq('doctor_id', filters.doctorId);
+      if (filters?.doctorId) q = q.eq('doctor_ref_id', filters.doctorId);
       if (filters?.status)   q = q.eq('status', filters.status);
       if (filters?.search?.trim()) {
         q = q.or(`walk_in_name.ilike.%${filters.search}%`);
@@ -61,6 +63,7 @@ export function useTodayAppointments() {
           *,
           patient:patients(first_name, last_name),
           doctor:profiles!appointments_doctor_id_fkey(full_name),
+          doctor_ref:doctors!appointments_doctor_ref_id_fkey(full_name),
           service:services(name)
         `)
         .eq('clinic_id', clinicId!)
@@ -88,6 +91,36 @@ export function useCreateAppointment() {
         .single();
       if (error) throw error;
       return data as Appointment;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+  });
+}
+
+export function useUpdateAppointment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, values }: { id: string; values: Partial<AppointmentInsert> }) => {
+      const { error } = await db
+        .from('appointments')
+        .update(values)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+  });
+}
+
+export function useDeleteAppointment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db
+        .from('appointments')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
   });

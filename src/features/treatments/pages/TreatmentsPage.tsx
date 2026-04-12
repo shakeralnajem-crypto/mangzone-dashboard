@@ -3,13 +3,15 @@ import { ClipboardList, Plus, Search } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
 import { usePatients } from '@/hooks/usePatients';
 import { useDoctors } from '@/hooks/useStaff';
 
 interface TreatmentPlan {
   id: string;
   title: string;
-  description: string | null;
   status: string | null;
   start_date: string | null;
   end_date: string | null;
@@ -31,7 +33,7 @@ function useTreatmentPlans() {
     queryKey: ['treatment_plans', clinicId],
     enabled: !!clinicId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('treatment_plans')
         .select(`
           *,
@@ -51,8 +53,8 @@ function useCreateTreatmentPlan() {
   const qc = useQueryClient();
   const { profile } = useAuthStore();
   return useMutation({
-    mutationFn: async (values: { patient_id: string; doctor_id: string; title: string; description: string; start_date: string }) => {
-      const { data, error } = await supabase
+    mutationFn: async (values: { patient_id: string; doctor_id: string; title: string; start_date: string }) => {
+      const { data, error } = await db
         .from('treatment_plans')
         .insert({
           ...values,
@@ -62,7 +64,6 @@ function useCreateTreatmentPlan() {
           patient_id: values.patient_id || null,
           doctor_id: values.doctor_id || null,
           start_date: values.start_date || null,
-          description: values.description || null,
         })
         .select()
         .single();
@@ -76,7 +77,7 @@ function useCreateTreatmentPlan() {
 export function TreatmentsPage() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ patient_id: '', doctor_id: '', title: '', description: '', start_date: '' });
+  const [form, setForm] = useState({ patient_id: '', doctor_id: '', title: '', start_date: '' });
 
   const { data: plans = [], isLoading, error } = useTreatmentPlans();
   const { data: patients = [] } = usePatients('');
@@ -93,7 +94,7 @@ export function TreatmentsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     await create.mutateAsync(form);
-    setForm({ patient_id: '', doctor_id: '', title: '', description: '', start_date: '' });
+    setForm({ patient_id: '', doctor_id: '', title: '', start_date: '' });
     setShowForm(false);
   };
 
@@ -158,13 +159,6 @@ export function TreatmentsPage() {
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
-            <textarea
-              placeholder="Description / notes"
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={2}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500 sm:col-span-2 resize-none"
-            />
           </div>
           <div className="flex gap-2">
             <button type="submit" disabled={create.isPending}
@@ -217,10 +211,7 @@ export function TreatmentsPage() {
                   <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                     {plan.patient ? `${plan.patient.first_name} ${plan.patient.last_name}` : '—'}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{plan.title}</p>
-                    {plan.description && <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-xs">{plan.description}</p>}
-                  </td>
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{plan.title}</td>
                   <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{plan.doctor?.full_name ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[plan.status ?? 'ACTIVE'] ?? 'bg-slate-100 text-slate-600'}`}>

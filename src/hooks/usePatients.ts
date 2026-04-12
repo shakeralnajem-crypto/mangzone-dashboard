@@ -104,6 +104,27 @@ export function useCreatePatient() {
   });
 }
 
+export function useUpdatePatient() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, values }: { id: string; values: Partial<PatientInsert> }) => {
+      try {
+        const { data, error } = await db
+          .from('patients')
+          .update(values)
+          .eq('id', id)
+          .select();
+        if (error) throw error;
+        return data?.[0] as Patient;
+      } catch (error) {
+        throw toAppError(error, 'Failed to update patient.');
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['patients'] }),
+  });
+}
+
 export function useDeletePatient() {
   const qc = useQueryClient();
 

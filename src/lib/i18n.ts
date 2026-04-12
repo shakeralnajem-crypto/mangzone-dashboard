@@ -19,11 +19,16 @@ const resources = {
       'nav.dashboard': 'Dashboard',
       'nav.patients': 'Patients',
       'nav.appointments': 'Appointments',
+      'nav.leads': 'Leads / CRM',
       'nav.treatments': 'Treatments',
       'nav.billing': 'Billing',
       'nav.settings': 'Settings',
       'nav.staff': 'Staff',
       'nav.reports': 'Reports',
+      'nav.services': 'Services',
+      'nav.followup': 'Follow-ups',
+      'nav.accounting': 'Accounting',
+      'nav.content': 'Content Planner',
 
       // Common
       'common.loading': 'Loading...',
@@ -64,11 +69,16 @@ const resources = {
       'nav.dashboard': 'لوحة التحكم',
       'nav.patients': 'المرضى',
       'nav.appointments': 'المواعيد',
+      'nav.leads': 'العملاء المحتملون',
       'nav.treatments': 'خطط العلاج',
       'nav.billing': 'الفواتير',
       'nav.settings': 'الإعدادات',
       'nav.staff': 'الموظفون',
       'nav.reports': 'التقارير',
+      'nav.services': 'الخدمات',
+      'nav.followup': 'المتابعة',
+      'nav.accounting': 'المحاسبة',
+      'nav.content': 'مخطط المحتوى',
 
       // Common
       'common.loading': 'جاري التحميل...',

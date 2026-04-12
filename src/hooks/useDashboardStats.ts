@@ -2,6 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
+
 export function useDashboardStats() {
   const clinicId = useAuthStore((s) => s.profile?.clinic_id);
   const today = new Date().toISOString().slice(0, 10);
@@ -14,49 +17,37 @@ export function useDashboardStats() {
     queryFn: async () => {
       const [patients, todayAppts, unpaidInvoices, monthPayments, newLeads, cancelledAppts] =
         await Promise.all([
-          // Total active patients
-          supabase
-            .from('patients')
+          db.from('patients')
             .select('id', { count: 'exact', head: true })
             .eq('clinic_id', clinicId!)
             .is('deleted_at', null),
 
-          // Today's appointments
-          supabase
-            .from('appointments')
+          db.from('appointments')
             .select('id', { count: 'exact', head: true })
             .eq('clinic_id', clinicId!)
             .is('deleted_at', null)
             .gte('start_time', `${today}T00:00:00`)
             .lte('start_time', `${today}T23:59:59`),
 
-          // Unpaid invoices
-          supabase
-            .from('invoices')
+          db.from('invoices')
             .select('id', { count: 'exact', head: true })
             .eq('clinic_id', clinicId!)
             .is('deleted_at', null)
             .in('status', ['UNPAID', 'PARTIALLY_PAID']),
 
-          // Monthly revenue (sum of payments this month)
-          supabase
-            .from('payments')
+          db.from('payments')
             .select('amount')
             .eq('clinic_id', clinicId!)
             .is('deleted_at', null)
-            .gte('payment_date', `${monthStart}T00:00:00`),
+            .gte('payment_date', monthStart),
 
-          // New leads
-          supabase
-            .from('leads')
+          db.from('leads')
             .select('id', { count: 'exact', head: true })
             .eq('clinic_id', clinicId!)
             .is('deleted_at', null)
             .eq('status', 'NEW'),
 
-          // Today cancelled
-          supabase
-            .from('appointments')
+          db.from('appointments')
             .select('id', { count: 'exact', head: true })
             .eq('clinic_id', clinicId!)
             .eq('status', 'CANCELLED')
@@ -65,7 +56,7 @@ export function useDashboardStats() {
             .lte('start_time', `${today}T23:59:59`),
         ]);
 
-      const monthlyRevenue = (monthPayments.data ?? []).reduce(
+      const monthlyRevenue = ((monthPayments.data ?? []) as { amount: number }[]).reduce(
         (sum, p) => sum + (p.amount ?? 0),
         0
       );
