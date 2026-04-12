@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ClipboardList, Plus, Search } from 'lucide-react';
+import { ClipboardList, Plus, Search, X, Edit2, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
+import { useTranslation } from 'react-i18next';
+import { useT, getStatusLabel } from '@/lib/translations';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -12,20 +14,24 @@ import { useDoctors } from '@/hooks/useStaff';
 interface TreatmentPlan {
   id: string;
   title: string;
+  name: string | null;
   status: string | null;
   start_date: string | null;
   end_date: string | null;
+  patient_id: string | null;
+  doctor_id: string | null;
   created_at: string;
   patient: { first_name: string; last_name: string } | null;
-  doctor: { full_name: string } | null;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  ACTIVE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  COMPLETED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  ON_HOLD: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  CANCELLED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+const STATUS_CLS: Record<string, string> = {
+  PLANNED:     'ds-badge ds-badge-a',
+  IN_PROGRESS: 'ds-badge ds-badge-ok',
+  COMPLETED:   'ds-badge ds-badge-neutral',
+  CANCELLED:   'ds-badge ds-badge-err',
 };
+
+const STATUS_OPTIONS = ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 
 function useTreatmentPlans() {
   const clinicId = useAuthStore((s) => s.profile?.clinic_id);
@@ -35,11 +41,7 @@ function useTreatmentPlans() {
     queryFn: async () => {
       const { data, error } = await db
         .from('treatment_plans')
-        .select(`
-          *,
-          patient:patients(first_name, last_name),
-          doctor:profiles!treatment_plans_doctor_id_fkey(full_name)
-        `)
+        .select(`*, patient:patients(first_name, last_name)`)
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
@@ -57,10 +59,11 @@ function useCreateTreatmentPlan() {
       const { data, error } = await db
         .from('treatment_plans')
         .insert({
-          ...values,
           clinic_id: profile!.clinic_id,
           created_by: profile!.id,
-          status: 'ACTIVE',
+          status: 'PLANNED',
+          name: values.title,
+          title: values.title,
           patient_id: values.patient_id || null,
           doctor_id: values.doctor_id || null,
           start_date: values.start_date || null,
@@ -74,15 +77,145 @@ function useCreateTreatmentPlan() {
   });
 }
 
+function useUpdateTreatmentPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: { id: string; patient_id?: string | null; doctor_id?: string | null; title?: string; status?: string; start_date?: string | null }) => {
+      const { id, title, ...rest } = values;
+      const { error } = await db
+        .from('treatment_plans')
+        .update({ ...rest, ...(title ? { title, name: title } : {}), updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['treatment_plans'] }),
+  });
+}
+
+function useDeleteTreatmentPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db
+        .from('treatment_plans')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['treatment_plans'] }),
+  });
+}
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+
+function EditModal({
+  plan, isAr, patients, doctors, onClose,
+}: {
+  plan: TreatmentPlan;
+  isAr: boolean;
+  patients: { id: string; first_name: string; last_name: string }[];
+  doctors: { id: string; full_name: string }[];
+  onClose: () => void;
+}) {
+  const t = useT(isAr);
+  const update = useUpdateTreatmentPlan();
+  const [form, setForm] = useState({
+    patient_id: plan.patient_id ?? '',
+    doctor_id:  plan.doctor_id  ?? '',
+    title:      plan.title      ?? plan.name ?? '',
+    status:     plan.status     ?? 'PLANNED',
+    start_date: plan.start_date ?? '',
+  });
+  const [err, setErr] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr('');
+    try {
+      await update.mutateAsync({
+        id: plan.id,
+        patient_id: form.patient_id || null,
+        doctor_id:  form.doctor_id  || null,
+        title:      form.title,
+        status:     form.status,
+        start_date: form.start_date || null,
+      });
+      onClose();
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 500 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>{t.editTreatment}</span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="ds-label">{t.patient}</label>
+              <select className="ds-input" value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}>
+                <option value="">{t.selectPatient}</option>
+                {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="ds-label">{t.doctor}</label>
+              <select className="ds-input" value={form.doctor_id} onChange={e => setForm(f => ({ ...f, doctor_id: e.target.value }))}>
+                <option value="">{t.selectDoctor}</option>
+                {doctors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="ds-label">{t.treatmentName} *</label>
+              <input required className="ds-input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="ds-label">{t.status}</label>
+              <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                {STATUS_OPTIONS.map(s => (
+                  <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="ds-label">{t.startDate}</label>
+              <input type="date" className="ds-input" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+            </div>
+          </div>
+          {err && <p className="ds-error">{err}</p>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={update.isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {update.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.save}
+            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export function TreatmentsPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<TreatmentPlan | null>(null);
   const [form, setForm] = useState({ patient_id: '', doctor_id: '', title: '', start_date: '' });
 
   const { data: plans = [], isLoading, error } = useTreatmentPlans();
   const { data: patients = [] } = usePatients('');
   const { data: doctors = [] } = useDoctors();
   const create = useCreateTreatmentPlan();
+  const remove = useDeleteTreatmentPlan();
 
   const filtered = search.trim()
     ? plans.filter(p =>
@@ -98,134 +231,156 @@ export function TreatmentsPage() {
     setShowForm(false);
   };
 
+  const handleDelete = (plan: TreatmentPlan) => {
+    const msg = isAr
+      ? `حذف خطة "${plan.title}"؟ لا يمكن التراجع.`
+      : `Delete plan "${plan.title}"? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    remove.mutate(plan.id);
+  };
+
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Treatment Plans</h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{filtered.length} plans</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.3s ease' }}>
+
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {filtered.length} {isAr ? 'خطة' : 'plans'}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setShowForm(v => !v)} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addTreatment}
+          </button>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:opacity-90 transition-opacity"
-        >
-          <Plus className="h-4 w-4" /> New Plan
-        </button>
+
+        <div style={{ marginTop: 14, position: 'relative' }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--txt3)', pointerEvents: 'none' }} />
+          <input
+            placeholder={isAr ? 'بحث بالمريض أو اسم الخطة...' : 'Search by patient or plan title...'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="ds-search"
+            style={{ paddingLeft: 36 }}
+          />
+        </div>
       </div>
 
+      {/* Add form */}
       {showForm && (
-        <form
-          onSubmit={handleCreate}
-          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4 shadow-sm"
-        >
-          <h2 className="font-semibold text-slate-900 dark:text-slate-100">New Treatment Plan</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Patient *</label>
-              <select
-                required
-                value={form.patient_id}
-                onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">— Select patient —</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Doctor</label>
-              <select
-                value={form.doctor_id}
-                onChange={e => setForm(f => ({ ...f, doctor_id: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">— Select doctor —</option>
-                {doctors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-              </select>
-            </div>
-            <input
-              required
-              placeholder="Plan title *"
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Start Date</label>
-              <input
-                type="date"
-                value={form.start_date}
-                onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
+        <div className="ds-card" style={{ padding: '20px 22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{t.addTreatment}</span>
+            <button className="ds-modal-close" onClick={() => setShowForm(false)}><X size={15} /></button>
           </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={create.isPending}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
-              {create.isPending ? 'Saving...' : 'Save Plan'}
-            </button>
-            <button type="button" onClick={() => setShowForm(false)}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-              Cancel
-            </button>
-          </div>
-          {create.isError && <p className="text-sm text-red-600">{(create.error as Error).message}</p>}
-        </form>
+          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="ds-label">{t.patient} *</label>
+                <select required className="ds-input" value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}>
+                  <option value="">{t.selectPatient}</option>
+                  {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ds-label">{t.doctor}</label>
+                <select className="ds-input" value={form.doctor_id} onChange={e => setForm(f => ({ ...f, doctor_id: e.target.value }))}>
+                  <option value="">{t.selectDoctor}</option>
+                  {doctors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ds-label">{t.treatmentName} *</label>
+                <input required className="ds-input" placeholder={isAr ? 'مثال: علاج تقويمي' : 'e.g. Orthodontic Treatment'} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+              </div>
+              <div>
+                <label className="ds-label">{t.startDate}</label>
+                <input type="date" className="ds-input" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+              </div>
+            </div>
+            {create.isError && <p className="ds-error">{(create.error as Error).message}</p>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={create.isPending} className="ds-btn ds-btn-primary">
+                {create.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.save}
+              </button>
+              <button type="button" onClick={() => setShowForm(false)} className="ds-btn ds-btn-ghost">{t.cancel}</button>
+            </div>
+          </form>
+        </div>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <input
-          placeholder="Search by patient or plan title..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-        />
-      </div>
-
+      {/* Table */}
       {isLoading ? (
-        <div className="flex justify-center py-12"><div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" /></div>
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
+        </div>
       ) : error ? (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-400">{(error as Error).message}</div>
+        <div className="ds-card" style={{ padding: 18, background: 'var(--err-soft)', border: '1px solid var(--err)', color: 'var(--err)' }}>
+          {(error as Error).message}
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-12 text-center">
-          <ClipboardList className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-sm text-slate-400">{search ? 'No plans found.' : 'No treatment plans yet.'}</p>
+        <div className="ds-empty">
+          <ClipboardList size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{t.noTreatmentsFound}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="ds-table">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Patient</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Plan</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Doctor</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Start Date</th>
+              <tr>
+                <th className="ds-th">{t.patient}</th>
+                <th className="ds-th">{isAr ? 'الخطة' : 'Plan'}</th>
+                <th className="ds-th">{t.doctor}</th>
+                <th className="ds-th">{t.status}</th>
+                <th className="ds-th">{t.startDate}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {filtered.map(plan => (
-                <tr key={plan.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
+                <tr key={plan.id} className="ds-tbody-row">
+                  <td className="ds-td" style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
                     {plan.patient ? `${plan.patient.first_name} ${plan.patient.last_name}` : '—'}
                   </td>
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{plan.title}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{plan.doctor?.full_name ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[plan.status ?? 'ACTIVE'] ?? 'bg-slate-100 text-slate-600'}`}>
-                      {plan.status ?? 'ACTIVE'}
+                  <td className="ds-td" style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                    {plan.title ?? plan.name ?? '—'}
+                  </td>
+                  <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>
+                    {plan.doctor_id ? (doctors.find(d => d.id === plan.doctor_id)?.full_name ?? '—') : '—'}
+                  </td>
+                  <td className="ds-td">
+                    <span className={STATUS_CLS[plan.status ?? 'PLANNED'] ?? 'ds-badge ds-badge-neutral'}>
+                      {getStatusLabel(plan.status ?? 'PLANNED', isAr)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-400 dark:text-slate-500 text-xs">
-                    {plan.start_date ? new Date(plan.start_date).toLocaleDateString() : '—'}
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>
+                    {plan.start_date ? new Date(plan.start_date).toLocaleDateString('en-EG') : '—'}
+                  </td>
+                  <td className="ds-td">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                      <button onClick={() => setEditingPlan(plan)} className="ds-icon-btn">
+                        <Edit2 size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(plan)} className="ds-icon-btn-err">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {editingPlan && (
+        <EditModal
+          plan={editingPlan}
+          isAr={isAr}
+          patients={patients}
+          doctors={doctors}
+          onClose={() => setEditingPlan(null)}
+        />
       )}
     </div>
   );

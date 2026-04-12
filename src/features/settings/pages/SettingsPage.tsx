@@ -2,97 +2,128 @@ import { Settings, Moon, Sun, Globe } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from 'react-i18next';
+import { useT } from '@/lib/translations';
 
 export function SettingsPage() {
   const { theme, toggle } = useThemeStore();
   const { profile } = useAuthStore();
   const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
 
   const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'en' ? 'ar' : 'en');
+    i18n.changeLanguage(isAr ? 'en' : 'ar');
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Settings</h1>
-        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Manage your preferences</p>
-      </div>
+  const isDark = theme === 'dark';
 
-      {/* Profile info */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Settings className="h-4 w-4 text-brand-600" /> Account
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 640, animation: 'fadeIn 0.3s ease' }}>
+
+      {/* Account */}
+      <div className="ds-card" style={{ padding: '20px 22px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Settings size={15} style={{ color: 'var(--p2)' }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{t.account}</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Full Name</label>
-            <p className="rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+            <label className="ds-label">{t.fullName}</label>
+            <div style={{
+              borderRadius: 10, border: '1px solid var(--brd)',
+              background: 'var(--bg3)', padding: '9px 12px',
+              fontSize: 13, color: 'var(--txt2)',
+            }}>
               {profile?.full_name ?? '—'}
-            </p>
+            </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Role</label>
-            <p className="rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+            <label className="ds-label">{t.role}</label>
+            <div style={{
+              borderRadius: 10, border: '1px solid var(--brd)',
+              background: 'var(--bg3)', padding: '9px 12px',
+              fontSize: 13, color: 'var(--txt2)',
+            }}>
               {profile?.role ?? '—'}
-            </p>
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Specialization</label>
-            <p className="rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label className="ds-label">{t.specialization}</label>
+            <div style={{
+              borderRadius: 10, border: '1px solid var(--brd)',
+              background: 'var(--bg3)', padding: '9px 12px',
+              fontSize: 13, color: 'var(--txt2)',
+            }}>
               {profile?.specialization ?? '—'}
-            </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Appearance */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Moon className="h-4 w-4 text-brand-600" /> Appearance
-        </h2>
-        <div className="flex items-center justify-between">
+      <div className="ds-card" style={{ padding: '20px 22px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Moon size={15} style={{ color: 'var(--p2)' }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{t.appearance}</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14 }}>
           <div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Dark Mode</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Switch between light and dark interface</p>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--txt)', marginBottom: 2 }}>{t.darkMode}</p>
+            <p style={{ fontSize: 12, color: 'var(--txt3)' }}>{t.darkModeDesc}</p>
           </div>
           <button
             onClick={toggle}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-200'}`}
+            style={{
+              position: 'relative', display: 'inline-flex', alignItems: 'center',
+              width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: isDark ? 'var(--p2)' : 'var(--brd)',
+              transition: 'background 0.2s',
+              flexShrink: 0,
+            }}
           >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`} />
+            <span style={{
+              position: 'absolute', top: 3, left: isDark ? 23 : 3,
+              width: 18, height: 18, borderRadius: '50%',
+              background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              transition: 'left 0.2s',
+            }} />
           </button>
         </div>
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid var(--brd)' }}>
           <div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Current theme</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Saved in browser storage</p>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--txt)', marginBottom: 2 }}>{t.currentTheme}</p>
+            <p style={{ fontSize: 12, color: 'var(--txt3)' }}>{t.currentThemeDesc}</p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            {theme === 'dark' ? 'Dark' : 'Light'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--txt2)' }}>
+            {isDark ? <Moon size={14} /> : <Sun size={14} />}
+            {isDark ? t.dark : t.light}
           </div>
         </div>
       </div>
 
       {/* Language */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Globe className="h-4 w-4 text-brand-600" /> Language
-        </h2>
-        <div className="flex items-center justify-between">
+      <div className="ds-card" style={{ padding: '20px 22px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Globe size={15} style={{ color: 'var(--p2)' }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{t.language}</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Interface Language</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Currently: {i18n.language === 'en' ? 'English' : 'العربية'}</p>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--txt)', marginBottom: 2 }}>{t.interfaceLanguage}</p>
+            <p style={{ fontSize: 12, color: 'var(--txt3)' }}>
+              {t.currently}: {isAr ? 'العربية' : 'English'}
+            </p>
           </div>
-          <button
-            onClick={toggleLanguage}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            {i18n.language === 'en' ? 'التبديل إلى العربية' : 'Switch to English'}
+          <button onClick={toggleLanguage} className="ds-btn ds-btn-ghost" style={{ fontSize: 13 }}>
+            {isAr ? t.switchToEnglish : t.switchToArabic}
           </button>
         </div>
       </div>
+
     </div>
   );
 }

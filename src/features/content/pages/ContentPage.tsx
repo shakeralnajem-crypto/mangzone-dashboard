@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Share2, Plus, X, Copy, Check, Edit2, Trash2, List, CalendarDays } from 'lucide-react';
 import { useContentPosts, useCreateContentPost, useUpdateContentPost, useDeleteContentPost } from '@/hooks/useContent';
+import { useTranslation } from 'react-i18next';
+import { useT, getStatusLabel } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type ContentPost = Database['public']['Tables']['content_posts']['Row'];
@@ -8,38 +10,43 @@ type PostStatus = ContentPost['status'];
 type PostPlatform = ContentPost['platform'];
 type PostType = ContentPost['post_type'];
 
-const STATUS_COLORS: Record<PostStatus, string> = {
-  IDEA: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-  DRAFT: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  READY: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  PUBLISHED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+const STATUS_CLS: Record<PostStatus, string> = {
+  IDEA:      'ds-badge ds-badge-neutral',
+  DRAFT:     'ds-badge ds-badge-warn',
+  READY:     'ds-badge ds-badge-a',
+  PUBLISHED: 'ds-badge ds-badge-ok',
 };
 
 const PLATFORMS: PostPlatform[] = ['INSTAGRAM', 'FACEBOOK', 'BOTH'];
 const POST_TYPES: PostType[] = ['EDUCATIONAL', 'PROMOTIONAL', 'BEFORE_AFTER', 'TESTIMONIAL', 'TEAM', 'OFFER'];
 const STATUSES: PostStatus[] = ['IDEA', 'DRAFT', 'READY', 'PUBLISHED'];
 
-const emptyForm: {
-  title: string;
-  caption: string;
-  hashtags: string;
-  platform: PostPlatform;
-  post_type: PostType;
-  scheduled_date: string;
-  status: PostStatus;
-  notes: string;
-} = {
-  title: '',
-  caption: '',
-  hashtags: '',
-  platform: 'INSTAGRAM',
-  post_type: 'EDUCATIONAL',
-  scheduled_date: '',
-  status: 'IDEA',
-  notes: '',
+const POST_TYPE_LABELS: Record<PostType, { en: string; ar: string }> = {
+  EDUCATIONAL:  { en: 'Educational',  ar: 'تعليمي' },
+  PROMOTIONAL:  { en: 'Promotional',  ar: 'ترويجي' },
+  BEFORE_AFTER: { en: 'Before/After', ar: 'قبل/بعد' },
+  TESTIMONIAL:  { en: 'Testimonial',  ar: 'تقييم' },
+  TEAM:         { en: 'Team',         ar: 'الفريق' },
+  OFFER:        { en: 'Offer',        ar: 'عرض' },
 };
 
-function CopyButton({ text }: { text: string }) {
+const PLATFORM_LABELS: Record<PostPlatform, { en: string; ar: string }> = {
+  INSTAGRAM: { en: 'Instagram', ar: 'إنستغرام' },
+  FACEBOOK:  { en: 'Facebook',  ar: 'فيسبوك' },
+  BOTH:      { en: 'Both',      ar: 'كلاهما' },
+};
+
+const emptyForm: {
+  title: string; caption: string; hashtags: string;
+  platform: PostPlatform; post_type: PostType;
+  scheduled_date: string; status: PostStatus; notes: string;
+} = {
+  title: '', caption: '', hashtags: '',
+  platform: 'INSTAGRAM', post_type: 'EDUCATIONAL',
+  scheduled_date: '', status: 'IDEA', notes: '',
+};
+
+function CopyButton({ text, isAr }: { text: string; isAr: boolean }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
@@ -47,31 +54,19 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={handleCopy} title="Copy caption"
-      className="rounded p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+    <button onClick={handleCopy} title={isAr ? 'نسخ النص' : 'Copy caption'} className="ds-icon-btn">
+      {copied ? <Check size={13} style={{ color: 'var(--ok)' }} /> : <Copy size={13} />}
     </button>
   );
 }
 
-interface PostModalProps {
-  post: ContentPost | null;
-  onClose: () => void;
-}
+// ─── Post Modal ───────────────────────────────────────────────────────────────
 
-function PostModal({ post, onClose }: PostModalProps) {
+function PostModal({ post, isAr, onClose }: { post: ContentPost | null; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
   const [form, setForm] = useState(
     post
-      ? {
-          title: post.title,
-          caption: post.caption ?? '',
-          hashtags: post.hashtags ?? '',
-          platform: post.platform,
-          post_type: post.post_type,
-          scheduled_date: post.scheduled_date ?? '',
-          status: post.status,
-          notes: post.notes ?? '',
-        }
+      ? { title: post.title, caption: post.caption ?? '', hashtags: post.hashtags ?? '', platform: post.platform, post_type: post.post_type, scheduled_date: post.scheduled_date ?? '', status: post.status, notes: post.notes ?? '' }
       : { ...emptyForm }
   );
 
@@ -84,112 +79,93 @@ function PostModal({ post, onClose }: PostModalProps) {
     e.preventDefault();
     setSubmitError('');
     const payload = {
-      title: form.title,
-      caption: form.caption || null,
-      hashtags: form.hashtags || null,
-      platform: form.platform,
-      post_type: form.post_type,
-      scheduled_date: form.scheduled_date || null,
-      status: form.status,
-      notes: form.notes || null,
+      title: form.title, caption: form.caption || null, hashtags: form.hashtags || null,
+      platform: form.platform, post_type: form.post_type,
+      scheduled_date: form.scheduled_date || null, status: form.status, notes: form.notes || null,
     };
     try {
-      if (post) {
-        await update.mutateAsync({ id: post.id, ...payload });
-      } else {
-        await create.mutateAsync(payload);
-      }
+      if (post) { await update.mutateAsync({ id: post.id, ...payload }); }
+      else { await create.mutateAsync(payload); }
       onClose();
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? 'حدث خطأ، حاول مرة أخرى.';
-      setSubmitError(msg);
+      setSubmitError((err as { message?: string })?.message ?? (isAr ? 'حدث خطأ.' : 'An error occurred.'));
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {post ? 'Edit Post' : 'New Content Post'}
-          </h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <X className="h-4 w-4 text-slate-500" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 520 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {post ? t.editPost : t.addPost}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3">
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Title *</label>
-            <input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500" />
+            <label className="ds-label">{isAr ? 'العنوان' : 'Title'} *</label>
+            <input required className="ds-input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Platform</label>
-              <select value={form.platform} onChange={e => setForm(f => ({ ...f, platform: e.target.value as PostPlatform }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500">
-                {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+              <label className="ds-label">{t.platform}</label>
+              <select className="ds-input" value={form.platform} onChange={e => setForm(f => ({ ...f, platform: e.target.value as PostPlatform }))}>
+                {PLATFORMS.map(p => (
+                  <option key={p} value={p}>{PLATFORM_LABELS[p][isAr ? 'ar' : 'en']}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Post Type</label>
-              <select value={form.post_type} onChange={e => setForm(f => ({ ...f, post_type: e.target.value as PostType }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500">
-                {POST_TYPES.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+              <label className="ds-label">{t.type}</label>
+              <select className="ds-input" value={form.post_type} onChange={e => setForm(f => ({ ...f, post_type: e.target.value as PostType }))}>
+                {POST_TYPES.map(pt => (
+                  <option key={pt} value={pt}>{POST_TYPE_LABELS[pt][isAr ? 'ar' : 'en']}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as PostStatus }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500">
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              <label className="ds-label">{t.status}</label>
+              <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as PostStatus }))}>
+                {STATUSES.map(s => (
+                  <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Scheduled Date</label>
-              <input type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500" />
+              <label className="ds-label">{t.scheduledDate}</label>
+              <input type="date" className="ds-input" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Caption</label>
-            <textarea value={form.caption} onChange={e => setForm(f => ({ ...f, caption: e.target.value }))}
-              rows={3} placeholder="Write your post caption..."
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
+            <label className="ds-label">{t.caption}</label>
+            <textarea
+              className="ds-input" style={{ resize: 'none' }} rows={3}
+              value={form.caption}
+              onChange={e => setForm(f => ({ ...f, caption: e.target.value }))}
+              placeholder={isAr ? 'اكتب نص المنشور...' : 'Write your post caption...'}
+            />
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Hashtags</label>
-            <input value={form.hashtags} onChange={e => setForm(f => ({ ...f, hashtags: e.target.value }))}
-              placeholder="#dentist #dental #egypt"
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500" />
+            <label className="ds-label">{t.hashtags}</label>
+            <input className="ds-input" value={form.hashtags} onChange={e => setForm(f => ({ ...f, hashtags: e.target.value }))} placeholder="#dentist #dental #egypt" />
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Notes</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={2}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500 resize-none" />
+            <label className="ds-label">{t.notes}</label>
+            <textarea className="ds-input" style={{ resize: 'none' }} rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
 
-          {submitError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-              {submitError}
-            </p>
-          )}
+          {submitError && <p className="ds-error">{submitError}</p>}
 
-          <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={isPending}
-              className="flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:opacity-90 disabled:opacity-60">
-              {isPending ? 'Saving...' : post ? 'Save Changes' : 'Add Post'}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : post ? t.save : t.addPost}
             </button>
-            <button type="button" onClick={onClose}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
         </form>
       </div>
@@ -199,10 +175,15 @@ function PostModal({ post, onClose }: PostModalProps) {
 
 // ─── Calendar View ────────────────────────────────────────────────────────────
 
-function CalendarView({ posts, onEdit }: { posts: ContentPost[]; onEdit: (p: ContentPost) => void }) {
+const MONTH_NAMES_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTH_NAMES_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const DAY_NAMES_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_NAMES_AR = ['أح','إث','ثل','أر','خم','جم','سب'];
+
+function CalendarView({ posts, isAr, onEdit }: { posts: ContentPost[]; isAr: boolean; onEdit: (p: ContentPost) => void }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
+  const [month, setMonth] = useState(now.getMonth());
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -215,27 +196,32 @@ function CalendarView({ posts, onEdit }: { posts: ContentPost[]; onEdit: (p: Con
     postsByDate[d].push(p);
   }
 
-  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthNames = isAr ? MONTH_NAMES_AR : MONTH_NAMES_EN;
+  const dayNames = isAr ? DAY_NAMES_AR : DAY_NAMES_EN;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <button onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}
-          className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">←</button>
-        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{monthNames[month]} {year}</span>
-        <button onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}
-          className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">→</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button
+          onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}
+          className="ds-btn ds-btn-ghost" style={{ padding: '6px 12px' }}
+        >←</button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{monthNames[month]} {year}</span>
+        <button
+          onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}
+          className="ds-btn ds-btn-ghost" style={{ padding: '6px 12px' }}
+        >→</button>
       </div>
 
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800">
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-            <div key={d} className="py-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">{d}</div>
+      <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--brd)' }}>
+          {dayNames.map(d => (
+            <div key={d} style={{ padding: '8px 0', textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--txt3)' }}>{d}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
           {Array.from({ length: firstDay }).map((_, i) => (
-            <div key={`empty-${i}`} className="min-h-[80px] border-b border-r border-slate-100 dark:border-slate-800" />
+            <div key={`empty-${i}`} style={{ minHeight: 80, borderBottom: '1px solid var(--brd)', borderRight: '1px solid var(--brd)' }} />
           ))}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
@@ -243,22 +229,24 @@ function CalendarView({ posts, onEdit }: { posts: ContentPost[]; onEdit: (p: Con
             const dayPosts = postsByDate[dateStr] ?? [];
             const isToday = new Date().toISOString().slice(0, 10) === dateStr;
             return (
-              <div key={day}
-                className={`min-h-[80px] border-b border-r border-slate-100 dark:border-slate-800 p-1.5 ${
-                  isToday ? 'bg-indigo-50 dark:bg-indigo-900/10' : ''
-                }`}>
-                <span className={`text-xs font-medium ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                  {day}
-                </span>
-                <div className="mt-1 space-y-0.5">
+              <div key={day} style={{
+                minHeight: 80, borderBottom: '1px solid var(--brd)', borderRight: '1px solid var(--brd)',
+                padding: 6, background: isToday ? 'var(--p-ultra)' : 'transparent',
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: isToday ? 'var(--p2)' : 'var(--txt3)' }}>{day}</span>
+                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {dayPosts.slice(0, 2).map(p => (
-                    <div key={p.id} onClick={() => onEdit(p)}
-                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium cursor-pointer hover:opacity-80 ${STATUS_COLORS[p.status]}`}>
+                    <div
+                      key={p.id}
+                      onClick={() => onEdit(p)}
+                      className={STATUS_CLS[p.status]}
+                      style={{ cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}
+                    >
                       {p.title}
                     </div>
                   ))}
                   {dayPosts.length > 2 && (
-                    <div className="text-[10px] text-slate-400 pl-1">+{dayPosts.length - 2} more</div>
+                    <div style={{ fontSize: 10, color: 'var(--txt3)' }}>+{dayPosts.length - 2} {isAr ? 'أكثر' : 'more'}</div>
                   )}
                 </div>
               </div>
@@ -273,6 +261,10 @@ function CalendarView({ posts, onEdit }: { posts: ContentPost[]; onEdit: (p: Con
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function ContentPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
@@ -285,7 +277,7 @@ export function ContentPage() {
   const deletePost = useDeleteContentPost();
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this post?')) return;
+    if (!confirm(isAr ? 'حذف هذا المنشور؟' : 'Delete this post?')) return;
     await deletePost.mutateAsync(id);
   };
 
@@ -293,98 +285,116 @@ export function ContentPage() {
   const openEdit = (p: ContentPost) => { setEditingPost(p); setModalOpen(true); };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Share2 className="h-6 w-6 text-pink-500" />
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Content Planner</h1>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{posts.length} posts</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <button onClick={() => setViewMode('list')}
-              className={`px-3 py-2 text-sm transition-colors ${viewMode === 'list' ? 'bg-brand-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-              <List className="h-4 w-4" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.3s ease' }}>
+
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {posts.length} {isAr ? 'منشور' : 'posts'}
+          </span>
+          <div style={{ flex: 1 }} />
+
+          {/* View toggle */}
+          <div style={{ display: 'flex', borderRadius: 8, border: '1px solid var(--brd)', overflow: 'hidden' }}>
+            <button
+              onClick={() => setViewMode('list')}
+              title={t.listView}
+              style={{
+                padding: '6px 10px', border: 'none', cursor: 'pointer', display: 'flex',
+                background: viewMode === 'list' ? 'var(--p2)' : 'transparent',
+                color: viewMode === 'list' ? '#fff' : 'var(--txt3)',
+                transition: 'all 0.15s',
+              }}
+            >
+              <List size={15} />
             </button>
-            <button onClick={() => setViewMode('calendar')}
-              className={`px-3 py-2 text-sm transition-colors ${viewMode === 'calendar' ? 'bg-brand-600 text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-              <CalendarDays className="h-4 w-4" />
+            <button
+              onClick={() => setViewMode('calendar')}
+              title={t.calendarView}
+              style={{
+                padding: '6px 10px', border: 'none', cursor: 'pointer', display: 'flex',
+                background: viewMode === 'calendar' ? 'var(--p2)' : 'transparent',
+                color: viewMode === 'calendar' ? '#fff' : 'var(--txt3)',
+                transition: 'all 0.15s',
+              }}
+            >
+              <CalendarDays size={15} />
             </button>
           </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:opacity-90 transition-opacity">
-            <Plus className="h-4 w-4" /> New Post
+
+          <button onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addPost}
           </button>
+        </div>
+
+        {/* Status filter */}
+        <div className="ds-tabs" style={{ marginTop: 14, borderTop: '1px solid var(--brd)', paddingTop: 12 }}>
+          {(['ALL', ...STATUSES] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`ds-tab${statusFilter === s ? ' active' : ''}`}
+            >
+              {s === 'ALL' ? t.allPosts : getStatusLabel(s, isAr)}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Status Filter */}
-      <div className="flex gap-1 overflow-x-auto">
-        {['ALL', ...STATUSES].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              statusFilter === s
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}>
-            {s}
-          </button>
-        ))}
-      </div>
-
+      {/* Content */}
       {isLoading ? (
-        <div className="flex justify-center py-12"><div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" /></div>
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
+        </div>
       ) : viewMode === 'calendar' ? (
-        <CalendarView posts={posts} onEdit={openEdit} />
+        <CalendarView posts={posts} isAr={isAr} onEdit={openEdit} />
       ) : posts.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-12 text-center">
-          <Share2 className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-sm text-slate-400">No content posts yet.</p>
+        <div className="ds-empty">
+          <Share2 size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{t.noPostsFound}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="ds-table">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Title</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Platform</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Scheduled</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Actions</th>
+              <tr>
+                <th className="ds-th">{isAr ? 'العنوان' : 'Title'}</th>
+                <th className="ds-th">{t.platform}</th>
+                <th className="ds-th">{t.type}</th>
+                <th className="ds-th">{t.status}</th>
+                <th className="ds-th">{t.scheduledDate}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {posts.map(post => (
-                <tr key={post.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{post.title}</p>
+                <tr key={post.id} className="ds-tbody-row">
+                  <td className="ds-td">
+                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{post.title}</p>
                     {post.caption && (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-xs">{post.caption}</p>
+                      <p style={{ fontSize: 11, color: 'var(--txt3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {post.caption}
+                      </p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{post.platform}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{post.post_type.replace('_', ' ')}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[post.status]}`}>
-                      {post.status}
-                    </span>
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt2)' }}>
+                    {PLATFORM_LABELS[post.platform][isAr ? 'ar' : 'en']}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-400 dark:text-slate-500">
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt2)' }}>
+                    {POST_TYPE_LABELS[post.post_type][isAr ? 'ar' : 'en']}
+                  </td>
+                  <td className="ds-td">
+                    <span className={STATUS_CLS[post.status]}>{getStatusLabel(post.status, isAr)}</span>
+                  </td>
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>
                     {post.scheduled_date ?? '—'}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} />}
-                      <button onClick={() => openEdit(post)} className="rounded p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={() => handleDelete(post.id)} className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                  <td className="ds-td">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                      {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
+                      <button onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
+                      <button onClick={() => handleDelete(post.id)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
                     </div>
                   </td>
                 </tr>
@@ -395,10 +405,7 @@ export function ContentPage() {
       )}
 
       {modalOpen && (
-        <PostModal
-          post={editingPost}
-          onClose={() => { setModalOpen(false); setEditingPost(null); }}
-        />
+        <PostModal post={editingPost} isAr={isAr} onClose={() => { setModalOpen(false); setEditingPost(null); }} />
       )}
     </div>
   );

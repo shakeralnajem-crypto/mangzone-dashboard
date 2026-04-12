@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Calendar, Download, GitCompareArrows, Plus, X, Edit2, Trash2, ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAppointments, useCreateAppointment, useUpdateAppointment, useDeleteAppointment } from '@/hooks/useAppointments';
 import { usePatients } from '@/hooks/usePatients';
 import { useDoctors } from '@/hooks/useStaff';
 import { useServices } from '@/hooks/useServices';
 import { exportToCsv } from '@/lib/exportCsv';
+import { useT, getStatusLabel } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type Appointment = Database['public']['Tables']['appointments']['Row'];
@@ -13,18 +15,29 @@ type AppointmentInsert = Database['public']['Tables']['appointments']['Insert'];
 const STATUSES = ['SCHEDULED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
 type ApptStatus = typeof STATUSES[number];
 
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED:   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  ARRIVED:     'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-  IN_PROGRESS: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  COMPLETED:   'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  CANCELLED:   'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  NO_SHOW:     'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+const STATUS_CLS: Record<string, string> = {
+  SCHEDULED:   'ds-badge ds-badge-p',
+  ARRIVED:     'ds-badge ds-badge-a',
+  IN_PROGRESS: 'ds-badge ds-badge-warn',
+  COMPLETED:   'ds-badge ds-badge-ok',
+  CANCELLED:   'ds-badge ds-badge-err',
+  NO_SHOW:     'ds-badge ds-badge-neutral',
 };
+
+const DOCTOR_COLORS = [
+  'linear-gradient(135deg,#6D28D9,#8B5CF6)',
+  'linear-gradient(135deg,#0891B2,#06B6D4)',
+  'linear-gradient(135deg,#059669,#10B981)',
+  'linear-gradient(135deg,#D97706,#F59E0B)',
+  'linear-gradient(135deg,#DC2626,#EF4444)',
+];
 
 // ─── Status Dropdown ──────────────────────────────────────────────────────────
 
-function StatusDropdown({ id, current, onUpdate }: { id: string; current: string; onUpdate: (id: string, s: string) => void }) {
+function StatusDropdown({ id, current, isAr, onUpdate }: {
+  id: string; current: string; isAr: boolean;
+  onUpdate: (id: string, s: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,24 +49,41 @@ function StatusDropdown({ id, current, onUpdate }: { id: string; current: string
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const cls = STATUS_CLS[current] ?? STATUS_CLS.SCHEDULED;
+
   return (
-    <div ref={ref} className="relative inline-block">
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
         onClick={() => setOpen(v => !v)}
-        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${STATUS_COLORS[current] ?? ''}`}
+        className={cls}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
       >
-        {current.replace('_', ' ')}
-        <ChevronDown className="h-3 w-3" />
+        {getStatusLabel(current, isAr)}
+        <ChevronDown style={{ width: 11, height: 11 }} />
       </button>
       {open && (
-        <div className="absolute left-0 top-7 z-30 min-w-[160px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div style={{
+          position: 'absolute', left: 0, top: 'calc(100% + 4px)', zIndex: 40,
+          minWidth: 160, borderRadius: 10, border: '1px solid var(--brd)',
+          background: 'var(--bg2)', boxShadow: 'var(--shadow)', padding: '4px 0',
+        }}>
           {STATUSES.map(s => (
             <button
               key={s}
               onClick={() => { onUpdate(id, s); setOpen(false); }}
-              className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${current === s ? 'text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-300'}`}
+              style={{
+                width: '100%', textAlign: 'left', padding: '7px 14px',
+                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                color: current === s ? 'var(--p2)' : 'var(--txt2)',
+                background: current === s ? 'var(--p-ultra)' : 'transparent',
+                border: 'none', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--p-ultra)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = current === s ? 'var(--p-ultra)' : 'transparent'; }}
             >
-              {s.replace('_', ' ')}
+              <span className={STATUS_CLS[s]} style={{ pointerEvents: 'none' }}>
+                {getStatusLabel(s, isAr)}
+              </span>
             </button>
           ))}
         </div>
@@ -66,18 +96,18 @@ function StatusDropdown({ id, current, onUpdate }: { id: string; current: string
 
 interface ApptModalProps {
   appointment: (Appointment & { patient?: { first_name: string; last_name: string } | null }) | null;
+  isAr: boolean;
   onClose: () => void;
 }
 
-function AppointmentModal({ appointment, onClose }: ApptModalProps) {
+function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps) {
+  const t = useT(isAr);
   const isEdit = !!appointment;
   const [apptType, setApptType] = useState<'patient' | 'walkin'>(
     appointment?.patient_id ? 'patient' : 'walkin'
   );
 
-  const startDt = appointment?.start_time
-    ? new Date(appointment.start_time)
-    : null;
+  const startDt = appointment?.start_time ? new Date(appointment.start_time) : null;
 
   const [form, setForm] = useState({
     patient_id: appointment?.patient_id ?? '',
@@ -120,23 +150,10 @@ function AppointmentModal({ appointment, onClose }: ApptModalProps) {
       notes: form.notes.trim() || null,
     };
 
-    // Validate
-    if (apptType === 'patient' && !form.patient_id) {
-      setSubmitError('Please select a patient.');
-      return;
-    }
-    if (apptType === 'walkin' && !form.walk_in_name.trim()) {
-      setSubmitError('Please enter the walk-in patient name.');
-      return;
-    }
-    if (!form.date) {
-      setSubmitError('Please select a date.');
-      return;
-    }
-    if (!form.time) {
-      setSubmitError('Please select a time.');
-      return;
-    }
+    if (apptType === 'patient' && !form.patient_id) { setSubmitError(isAr ? 'الرجاء اختيار مريض.' : 'Please select a patient.'); return; }
+    if (apptType === 'walkin' && !form.walk_in_name.trim()) { setSubmitError(isAr ? 'الرجاء إدخال اسم الزيارة.' : 'Please enter the walk-in patient name.'); return; }
+    if (!form.date) { setSubmitError(isAr ? 'الرجاء اختيار تاريخ.' : 'Please select a date.'); return; }
+    if (!form.time) { setSubmitError(isAr ? 'الرجاء اختيار وقت.' : 'Please select a time.'); return; }
 
     try {
       if (isEdit && appointment) {
@@ -146,216 +163,128 @@ function AppointmentModal({ appointment, onClose }: ApptModalProps) {
       }
       onClose();
     } catch (err) {
-      console.error('Appointment save error:', err);
-      const msg =
-        err instanceof Error
-          ? err.message
-          : (err as { message?: string })?.message ?? 'An error occurred. Please try again.';
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'An error occurred.';
       setSubmitError(msg);
     }
   };
 
-  const fieldClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {isEdit ? 'Edit Appointment' : 'New Appointment'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 520 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {isEdit ? t.editAppointment : t.addAppointment}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Patient type toggle */}
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Type toggle */}
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Appointment Type
-            </label>
-            <div className="flex rounded-xl border border-slate-200 overflow-hidden dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setApptType('patient')}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${apptType === 'patient' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'}`}
-              >
-                Registered Patient
-              </button>
-              <button
-                type="button"
-                onClick={() => setApptType('walkin')}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${apptType === 'walkin' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'}`}
-              >
-                Walk-in
-              </button>
+            <label className="ds-label">{isAr ? 'نوع الموعد' : 'Appointment Type'}</label>
+            <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
+              {(['patient', 'walkin'] as const).map(tp => (
+                <button
+                  key={tp}
+                  type="button"
+                  onClick={() => setApptType(tp)}
+                  style={{
+                    flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                    background: apptType === tp ? 'var(--p2)' : 'transparent',
+                    color: apptType === tp ? '#fff' : 'var(--txt2)',
+                  }}
+                >
+                  {tp === 'patient'
+                    ? (isAr ? 'مريض مسجل' : 'Registered Patient')
+                    : (isAr ? 'زيارة مباشرة' : 'Walk-in')}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Patient or Walk-in fields */}
+          {/* Patient / Walk-in fields */}
           {apptType === 'patient' ? (
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Patient
-              </label>
-              <select
-                value={form.patient_id}
-                onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}
-                className={fieldClass}
-              >
-                <option value="">— Select patient —</option>
-                {patients.map(p => (
-                  <option key={p.id} value={p.id}>{p.first_name} {p.last_name}{p.phone ? ` · ${p.phone}` : ''}</option>
-                ))}
+              <label className="ds-label">{t.patient}</label>
+              <select className="ds-input" value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}>
+                <option value="">{t.selectPatient}</option>
+                {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}{p.phone ? ` · ${p.phone}` : ''}</option>)}
               </select>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Walk-in Name *
-                </label>
-                <input
-                  required={apptType === 'walkin'}
-                  value={form.walk_in_name}
-                  onChange={e => setForm(f => ({ ...f, walk_in_name: e.target.value }))}
-                  className={fieldClass}
-                  placeholder="Full name"
-                />
+                <label className="ds-label">{isAr ? 'اسم الزائر *' : 'Walk-in Name *'}</label>
+                <input required className="ds-input" value={form.walk_in_name} onChange={e => setForm(f => ({ ...f, walk_in_name: e.target.value }))} placeholder={isAr ? 'الاسم الكامل' : 'Full name'} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Walk-in Phone
-                </label>
-                <input
-                  type="tel"
-                  value={form.walk_in_phone}
-                  onChange={e => setForm(f => ({ ...f, walk_in_phone: e.target.value }))}
-                  className={fieldClass}
-                  placeholder="01xxxxxxxxx"
-                />
+                <label className="ds-label">{isAr ? 'هاتف الزائر' : 'Walk-in Phone'}</label>
+                <input type="tel" className="ds-input" value={form.walk_in_phone} onChange={e => setForm(f => ({ ...f, walk_in_phone: e.target.value }))} placeholder="01xxxxxxxxx" />
               </div>
             </div>
           )}
 
           {/* Doctor & Service */}
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Doctor
-              </label>
-              <select
-                value={form.doctor_ref_id}
-                onChange={e => setForm(f => ({ ...f, doctor_ref_id: e.target.value }))}
-                className={fieldClass}
-              >
-                <option value="">— No doctor assigned —</option>
+              <label className="ds-label">{t.doctor}</label>
+              <select className="ds-input" value={form.doctor_ref_id} onChange={e => setForm(f => ({ ...f, doctor_ref_id: e.target.value }))}>
+                <option value="">{isAr ? '— بدون طبيب —' : '— No doctor assigned —'}</option>
                 {doctors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
               </select>
-              {doctors.length === 0 && (
-                <p className="mt-1 text-xs text-amber-500">No doctors found. Add doctors in the Staff page first.</p>
-              )}
+              {doctors.length === 0 && <p style={{ fontSize: 11, color: 'var(--warn)', marginTop: 4 }}>{isAr ? 'لا يوجد أطباء. أضف من صفحة الفريق.' : 'No doctors found. Add in Staff page.'}</p>}
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Service
-              </label>
-              <select
-                value={form.service_id}
-                onChange={e => setForm(f => ({ ...f, service_id: e.target.value }))}
-                className={fieldClass}
-              >
-                <option value="">— No service —</option>
+              <label className="ds-label">{t.service}</label>
+              <select className="ds-input" value={form.service_id} onChange={e => setForm(f => ({ ...f, service_id: e.target.value }))}>
+                <option value="">{t.selectService}</option>
                 {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              {services.length === 0 && (
-                <p className="mt-1 text-xs text-amber-500">No services found. Add services in the Services page first.</p>
-              )}
+              {services.length === 0 && <p style={{ fontSize: 11, color: 'var(--warn)', marginTop: 4 }}>{isAr ? 'لا توجد خدمات. أضف من صفحة الخدمات.' : 'No services found. Add in Services page.'}</p>}
             </div>
           </div>
 
           {/* Date & Time */}
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Date *
-              </label>
-              <input
-                required
-                type="date"
-                value={form.date}
-                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                className={fieldClass}
-              />
+              <label className="ds-label">{t.date} *</label>
+              <input required type="date" className="ds-input" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Time *
-              </label>
-              <input
-                required
-                type="time"
-                value={form.time}
-                onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
-                className={fieldClass}
-              />
+              <label className="ds-label">{t.time} *</label>
+              <input required type="time" className="ds-input" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             </div>
           </div>
 
           {/* Status */}
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Status
-            </label>
-            <select
-              value={form.status}
-              onChange={e => setForm(f => ({ ...f, status: e.target.value as ApptStatus }))}
-              className={fieldClass}
-            >
-              {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            <label className="ds-label">{t.status}</label>
+            <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as ApptStatus }))}>
+              {STATUSES.map(s => <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>)}
             </select>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Notes
-            </label>
+            <label className="ds-label">{t.notes}</label>
             <textarea
+              className="ds-input"
+              style={{ resize: 'none' }}
+              rows={2}
               value={form.notes}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={2}
-              className={`${fieldClass} resize-none`}
-              placeholder="Any additional notes..."
+              placeholder={isAr ? 'ملاحظات إضافية...' : 'Any additional notes...'}
             />
           </div>
 
-          {submitError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-              {submitError}
-            </p>
-          )}
+          {submitError && <p className="ds-error">{submitError}</p>}
 
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-60 transition-opacity"
-            >
-              {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Book Appointment'}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : isEdit ? t.save : (isAr ? 'حجز الموعد' : 'Book Appointment')}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-            >
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
         </form>
       </div>
@@ -365,7 +294,7 @@ function AppointmentModal({ appointment, onClose }: ApptModalProps) {
 
 // ─── Compare Days View ────────────────────────────────────────────────────────
 
-function CompareDaysView() {
+function CompareDaysView({ isAr }: { isAr: boolean }) {
   const today = new Date().toISOString().slice(0, 10);
   const [dateA, setDateA] = useState(today);
   const [dateB, setDateB] = useState(today);
@@ -382,113 +311,132 @@ function CompareDaysView() {
   const DayColumn = ({
     date, setDate, appts, label,
   }: { date: string; setDate: (d: string) => void; appts: typeof allAppointments; label: string }) => (
-    <div className="flex-1 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-        />
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--txt3)' }}>{label}</span>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="ds-input" style={{ flex: 1 }} />
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+      <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
         {appts.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-400">No appointments on this day.</div>
+          <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: 'var(--txt3)' }}>
+            {isAr ? 'لا توجد مواعيد في هذا اليوم.' : 'No appointments on this day.'}
+          </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {appts.map(a => (
-              <div key={a.id} className="flex items-start gap-3 px-4 py-3">
-                <div className="w-14 flex-shrink-0 text-center">
-                  <p className="text-xs font-semibold text-brand-600 dark:text-brand-400">
+          <div>
+            {appts.map((a, i) => (
+              <div key={a.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+                borderBottom: i < appts.length - 1 ? '1px solid var(--brd)' : 'none',
+              }}>
+                <div style={{ width: 52, flexShrink: 0, textAlign: 'center' }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--p2)' }}>
                     {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
                   </p>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {a.patient
-                      ? `${a.patient.first_name} ${a.patient.last_name}`
-                      : (a.walk_in_name ?? '—')}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : (a.walk_in_name ?? '—')}
                   </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">{a.service?.name ?? 'No service'}</p>
+                  <p style={{ fontSize: 11, color: 'var(--txt3)' }}>{a.service?.name ?? (isAr ? 'بدون خدمة' : 'No service')}</p>
                 </div>
-                <span className={`flex-shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[a.status ?? 'SCHEDULED'] ?? ''}`}>
-                  {(a.status ?? 'SCHEDULED').replace('_', ' ')}
+                <span className={STATUS_CLS[a.status ?? 'SCHEDULED'] ?? STATUS_CLS.SCHEDULED}>
+                  {getStatusLabel(a.status ?? 'SCHEDULED', isAr)}
                 </span>
               </div>
             ))}
           </div>
         )}
       </div>
-      <p className="text-right text-xs text-slate-400 dark:text-slate-500">
-        {appts.length} appointment{appts.length !== 1 ? 's' : ''}
+      <p style={{ textAlign: 'right', fontSize: 11, color: 'var(--txt3)' }}>
+        {appts.length} {isAr ? 'موعد' : `appointment${appts.length !== 1 ? 's' : ''}`}
       </p>
     </div>
   );
 
   return (
-    <div className="flex gap-4">
-      <DayColumn date={dateA} setDate={setDateA} appts={apptA} label="Day A" />
-      <div className="w-px self-stretch bg-slate-200 dark:bg-slate-700" />
-      <DayColumn date={dateB} setDate={setDateB} appts={apptB} label="Day B" />
+    <div style={{ display: 'flex', gap: 16 }}>
+      <DayColumn date={dateA} setDate={setDateA} appts={apptA} label={isAr ? 'اليوم أ' : 'Day A'} />
+      <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--brd)' }} />
+      <DayColumn date={dateB} setDate={setDateB} appts={apptB} label={isAr ? 'اليوم ب' : 'Day B'} />
     </div>
   );
 }
 
 // ─── Today's Doctor Grid ──────────────────────────────────────────────────────
 
-function TodayDoctorGrid({ appointments }: { appointments: Array<Appointment & { doctor_ref_id?: string | null; patient?: { first_name: string; last_name: string } | null; doctor?: { full_name: string } | null; doctor_ref?: { full_name: string } | null; service?: { name: string } | null; walk_in_name?: string | null }> }) {
+type RichAppt = Appointment & {
+  doctor_ref_id?: string | null;
+  patient?: { first_name: string; last_name: string } | null;
+  doctor?: { full_name: string } | null;
+  doctor_ref?: { full_name: string } | null;
+  service?: { name: string } | null;
+  walk_in_name?: string | null;
+};
+
+function TodayDoctorGrid({ appointments, isAr }: { appointments: RichAppt[]; isAr: boolean }) {
+  const t = useT(isAr);
   const today = new Date().toISOString().slice(0, 10);
   const todayAppts = appointments.filter(a => a.start_time.slice(0, 10) === today);
 
   if (todayAppts.length === 0) return null;
 
-  // Group by doctor_ref_id (new) falling back to doctor_id (legacy)
-  const grouped = new Map<string, { doctorName: string; appts: typeof todayAppts }>();
+  const grouped = new Map<string, { doctorName: string; appts: typeof todayAppts; colorIdx: number }>();
+  let colorIdx = 0;
   for (const a of todayAppts) {
     const key = a.doctor_ref_id ?? a.doctor_id ?? 'unassigned';
-    const doctorName = a.doctor_ref?.full_name ?? a.doctor?.full_name ?? 'Unassigned';
-    if (!grouped.has(key)) grouped.set(key, { doctorName, appts: [] });
+    const doctorName = a.doctor_ref?.full_name ?? a.doctor?.full_name ?? (isAr ? 'غير محدد' : 'Unassigned');
+    if (!grouped.has(key)) {
+      grouped.set(key, { doctorName, appts: [], colorIdx: colorIdx++ % DOCTOR_COLORS.length });
+    }
     grouped.get(key)!.appts.push(a);
   }
   const groups = Array.from(grouped.values()).sort((a, b) => a.doctorName.localeCompare(b.doctorName));
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        Today's Schedule — {new Date().toLocaleDateString('en-EG', { dateStyle: 'full' })}
-        <span className="ml-2 font-normal normal-case text-slate-400 dark:text-slate-500">({todayAppts.length} appointments)</span>
-      </h2>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {groups.map(({ doctorName, appts }) => (
-          <div key={doctorName} className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-brand-200 text-xs font-bold text-brand-700 dark:from-brand-900/40 dark:to-brand-800/40 dark:text-brand-300">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt)', margin: 0 }}>{t.todaySchedule}</h2>
+        <span style={{ fontSize: 11, color: 'var(--txt3)' }}>
+          {new Date().toLocaleDateString('en-EG', { dateStyle: 'full' })}
+        </span>
+        <span className="ds-badge ds-badge-p" style={{ marginLeft: 4 }}>{todayAppts.length} {t.appts}</span>
+      </div>
+      <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+        {groups.map(({ doctorName, appts, colorIdx: ci }) => (
+          <div key={doctorName} className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', borderBottom: '1px solid var(--brd)', background: 'var(--p-ultra)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="ds-avatar" style={{ width: 34, height: 34, fontSize: 13, flexShrink: 0, background: DOCTOR_COLORS[ci] }}>
                   {doctorName.charAt(0)}
                 </div>
-                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{doctorName}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt)' }}>{doctorName}</span>
               </div>
-              <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
-                {appts.length}
-              </span>
+              <span className="ds-badge ds-badge-p">{appts.length}</span>
             </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div>
               {appts
                 .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                .map(a => (
-                  <div key={a.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="w-12 flex-shrink-0 text-xs font-semibold text-brand-600 dark:text-brand-400">
+                .map((a, i) => (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+                    borderBottom: i < appts.length - 1 ? '1px solid var(--brd)' : 'none',
+                  }}>
+                    <span style={{ width: 46, flexShrink: 0, fontSize: 11, fontWeight: 700, color: 'var(--p2)' }}>
                       {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : (a.walk_in_name ?? '—')}
                       </p>
-                      <p className="truncate text-xs text-slate-400">{a.service?.name ?? 'No service'}</p>
+                      <p style={{ fontSize: 11, color: 'var(--txt3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {a.service?.name ?? (isAr ? 'بدون خدمة' : 'No service')}
+                      </p>
                     </div>
-                    <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[a.status ?? 'SCHEDULED'] ?? ''}`}>
-                      {(a.status ?? 'SCHEDULED').replace('_', ' ')}
+                    <span className={STATUS_CLS[a.status ?? 'SCHEDULED'] ?? STATUS_CLS.SCHEDULED} style={{ flexShrink: 0 }}>
+                      {getStatusLabel(a.status ?? 'SCHEDULED', isAr)}
                     </span>
                   </div>
                 ))}
@@ -503,11 +451,14 @@ function TodayDoctorGrid({ appointments }: { appointments: Array<Appointment & {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function AppointmentsPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [compareMode, setCompareMode] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAppt, setEditingAppt] = useState<(Appointment & { patient?: { first_name: string; last_name: string } | null }) | null>(null);
 
-  // Filters
   const [filterDate, setFilterDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -518,7 +469,6 @@ export function AppointmentsPage() {
     status: filterStatus || undefined,
   });
 
-  // Client-side date filter
   const appointments = filterDate
     ? allAppointments.filter(a => a.start_time.slice(0, 10) === filterDate)
     : allAppointments;
@@ -526,14 +476,14 @@ export function AppointmentsPage() {
   const updateAppt = useUpdateAppointment();
   const deleteAppt = useDeleteAppointment();
 
-  const errorMessage = error instanceof Error ? error.message : 'Failed to load appointments.';
+  const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المواعيد.' : 'Failed to load appointments.');
 
   const handleStatusChange = (id: string, status: string) => {
     updateAppt.mutate({ id, values: { status: status as ApptStatus } });
   };
 
   const handleDelete = async (a: Appointment) => {
-    if (!confirm('Delete this appointment?')) return;
+    if (!confirm(isAr ? 'حذف هذا الموعد؟' : 'Delete this appointment?')) return;
     await deleteAppt.mutateAsync(a.id);
   };
 
@@ -551,211 +501,154 @@ export function AppointmentsPage() {
   const openEdit = (a: typeof appointments[number]) => { setEditingAppt(a); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditingAppt(null); };
 
-  const filterInputClass = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Appointments</h1>
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {appointments.length} total
-              </span>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Review scheduled visits and check the current appointment status.
-            </p>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeIn 0.3s ease' }}>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Download className="h-4 w-4" /> Export CSV
-            </button>
-            <button
-              onClick={() => setCompareMode(m => !m)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                compareMode
-                  ? 'border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-400'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
-              }`}
-            >
-              <GitCompareArrows className="h-4 w-4" /> Compare Days
-            </button>
-            <button
-              onClick={openAdd}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-            >
-              <Plus className="h-4 w-4" /> Add Appointment
-            </button>
-          </div>
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {appointments.length} {isAr ? 'موعد' : 'appointments'}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={handleExport} className="ds-btn ds-btn-ghost" style={{ gap: 6 }}>
+            <Download size={14} /> {isAr ? 'تصدير CSV' : 'Export CSV'}
+          </button>
+          <button
+            onClick={() => setCompareMode(m => !m)}
+            className="ds-btn ds-btn-ghost"
+            style={{
+              gap: 6,
+              background: compareMode ? 'var(--p-soft)' : undefined,
+              color: compareMode ? 'var(--p2)' : undefined,
+              borderColor: compareMode ? 'var(--p3)' : undefined,
+            }}
+          >
+            <GitCompareArrows size={14} /> {t.compareView}
+          </button>
+          <button onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addAppointment}
+          </button>
         </div>
 
         {/* Filter bar */}
         {!compareMode && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-            <input
-              type="date"
-              value={filterDate}
-              onChange={e => setFilterDate(e.target.value)}
-              className={filterInputClass}
-            />
-            <select
-              value={filterDoctor}
-              onChange={e => setFilterDoctor(e.target.value)}
-              className={filterInputClass}
-            >
-              <option value="">All Doctors</option>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--brd)', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="ds-input" style={{ width: 160 }} />
+            <select value={filterDoctor} onChange={e => setFilterDoctor(e.target.value)} className="ds-input" style={{ minWidth: 160 }}>
+              <option value="">{isAr ? 'كل الأطباء' : 'All Doctors'}</option>
               {doctors.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
             </select>
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className={filterInputClass}
-            >
-              <option value="">All Statuses</option>
-              {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="ds-input" style={{ minWidth: 150 }}>
+              <option value="">{t.allStatuses}</option>
+              {STATUSES.map(s => <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>)}
             </select>
             {(filterDate || filterDoctor || filterStatus) && (
               <button
                 onClick={() => { setFilterDate(''); setFilterDoctor(''); setFilterStatus(''); }}
-                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="ds-btn ds-btn-ghost"
+                style={{ color: 'var(--err)', borderColor: 'var(--err-soft)', gap: 4, padding: '6px 12px' }}
               >
-                <X className="h-3.5 w-3.5" /> Clear
+                <X size={13} /> {isAr ? 'مسح' : 'Clear'}
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Today's Doctor Grid — only when no filters active and not compare mode */}
+      {/* Today's Doctor Grid */}
       {!compareMode && !filterDate && !filterDoctor && !filterStatus && !isLoading && (
-        <TodayDoctorGrid appointments={allAppointments} />
+        <TodayDoctorGrid appointments={allAppointments} isAr={isAr} />
       )}
 
-      {/* Compare mode */}
+      {/* Main content */}
       {compareMode ? (
-        <CompareDaysView />
+        <CompareDaysView isAr={isAr} />
       ) : isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white py-16 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
-          </div>
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        <div className="ds-card" style={{ padding: 18, background: 'var(--err-soft)', border: '1px solid var(--err)', color: 'var(--err)' }}>
           {errorMessage}
         </div>
       ) : appointments.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <Calendar className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
-          <p className="text-base font-medium text-slate-700 dark:text-slate-200">No appointments found.</p>
-          <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
-            Click "Add Appointment" to schedule the first one.
-          </p>
-          <button
-            onClick={openAdd}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-          >
-            <Plus className="h-4 w-4" /> Add Appointment
+        <div className="ds-empty">
+          <Calendar size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--txt)', marginBottom: 6 }}>{t.noAppointmentsFound}</p>
+          <p style={{ fontSize: 13, color: 'var(--txt3)', marginBottom: 16 }}>{t.addFirstAppointment}</p>
+          <button onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addAppointment}
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <table className="w-full text-sm">
+        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="ds-table">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Patient
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Date / Time
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Service
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Actions
-                </th>
+              <tr>
+                <th className="ds-th">{t.patient}</th>
+                <th className="ds-th">{t.date} / {t.time}</th>
+                <th className="ds-th">{t.service}</th>
+                <th className="ds-th">{t.status}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {appointments.map(a => (
-                <tr key={a.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-brand-200 text-sm font-semibold text-brand-700 dark:from-brand-900/40 dark:to-brand-800/40 dark:text-brand-300">
-                        {a.patient
-                          ? `${a.patient.first_name.charAt(0)}${a.patient.last_name.charAt(0)}`
-                          : (a.walk_in_name ?? 'W').slice(0, 2).toUpperCase()}
+            <tbody>
+              {appointments.map(a => {
+                const initials = a.patient
+                  ? `${a.patient.first_name.charAt(0)}${a.patient.last_name.charAt(0)}`
+                  : (a.walk_in_name ?? 'W').slice(0, 2).toUpperCase();
+                return (
+                  <tr key={a.id} className="ds-tbody-row">
+                    <td className="ds-td">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="ds-avatar" style={{ width: 36, height: 36, fontSize: 12, flexShrink: 0 }}>{initials}</div>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                            {a.patient
+                              ? `${a.patient.first_name} ${a.patient.last_name}`
+                              : (a.walk_in_name ?? '—')}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
+                            {a.patient ? (isAr ? 'مريض' : 'Patient') : (isAr ? 'زيارة مباشرة' : 'Walk-in')}
+                            {a.walk_in_phone ? ` · ${a.walk_in_phone}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
-                          {a.patient
-                            ? `${a.patient.first_name} ${a.patient.last_name}`
-                            : (a.walk_in_name ?? '—')}
-                        </p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">
-                          {a.patient ? 'Patient' : 'Walk-in'}
-                          {a.walk_in_phone ? ` · ${a.walk_in_phone}` : ''}
-                        </p>
+                    </td>
+                    <td className="ds-td">
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                        {new Date(a.start_time).toLocaleDateString('en-EG', { dateStyle: 'medium' })}
+                      </p>
+                      <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
+                        {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
+                      </p>
+                    </td>
+                    <td className="ds-td" style={{ color: 'var(--txt2)', fontSize: 13 }}>
+                      {a.service?.name ?? '—'}
+                    </td>
+                    <td className="ds-td">
+                      <StatusDropdown id={a.id} current={a.status ?? 'SCHEDULED'} isAr={isAr} onUpdate={handleStatusChange} />
+                    </td>
+                    <td className="ds-td">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                        <button onClick={() => openEdit(a)} className="ds-icon-btn" title={isAr ? 'تعديل' : 'Edit'}>
+                          <Edit2 size={14} />
+                        </button>
+                        <button onClick={() => handleDelete(a)} className="ds-icon-btn-err" title={isAr ? 'حذف' : 'Delete'}>
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-slate-700 dark:text-slate-200">
-                      {new Date(a.start_time).toLocaleDateString('en-EG', { dateStyle: 'medium' })}
-                    </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                    {a.service?.name ?? '—'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusDropdown
-                      id={a.id}
-                      current={a.status ?? 'SCHEDULED'}
-                      onUpdate={handleStatusChange}
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => openEdit(a)}
-                        title="Edit appointment"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(a)}
-                        title="Delete appointment"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {modalOpen && (
-        <AppointmentModal appointment={editingAppt} onClose={closeModal} />
-      )}
+      {modalOpen && <AppointmentModal appointment={editingAppt} isAr={isAr} onClose={closeModal} />}
     </div>
   );
 }

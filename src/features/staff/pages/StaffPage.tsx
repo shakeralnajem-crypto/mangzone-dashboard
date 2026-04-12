@@ -1,36 +1,51 @@
 import { useState } from 'react';
 import { Users, UserCog, Stethoscope, CalendarDays, ReceiptText, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   useStaff, useStaffStats, useDoctorsTable, useCreateDoctor, useUpdateDoctor, useDeleteDoctor,
   useClinicStaff, useCreateClinicStaff, useUpdateClinicStaff, useDeleteClinicStaff,
   type StaffRole, type ClinicStaffMember,
 } from '@/hooks/useStaff';
 import { formatEGP } from '@/lib/currency';
+import { useT } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type Doctor = Database['public']['Tables']['doctors']['Row'];
 
-const ROLE_COLORS: Record<string, string> = {
-  ADMIN:        'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  DOCTOR:       'bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400',
-  RECEPTIONIST: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-  ACCOUNTANT:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  MARKETING:    'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
-  NURSE:        'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-  OTHER:        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+const ROLE_CLS: Record<string, string> = {
+  ADMIN:        'ds-badge ds-badge-p',
+  DOCTOR:       'ds-badge ds-badge-a',
+  RECEPTIONIST: 'ds-badge ds-badge-ok',
+  ACCOUNTANT:   'ds-badge ds-badge-warn',
+  MARKETING:    'ds-badge ds-badge-err',
+  NURSE:        'ds-badge ds-badge-ok',
+  OTHER:        'ds-badge ds-badge-neutral',
 };
+
+const DOCTOR_COLORS = [
+  'linear-gradient(135deg,#6D28D9,#8B5CF6)',
+  'linear-gradient(135deg,#0891B2,#06B6D4)',
+  'linear-gradient(135deg,#059669,#10B981)',
+  'linear-gradient(135deg,#D97706,#F59E0B)',
+  'linear-gradient(135deg,#DC2626,#EF4444)',
+];
 
 const STAFF_ROLES: StaffRole[] = ['RECEPTIONIST', 'ACCOUNTANT', 'MARKETING', 'NURSE', 'OTHER'];
 
-// ─── Add / Edit Clinic Staff Modal ───────────────────────────────────────────
+const ROLE_LABEL_EN: Record<string, string> = {
+  RECEPTIONIST: 'Receptionist', ACCOUNTANT: 'Accountant',
+  MARKETING: 'Marketing', NURSE: 'Nurse', OTHER: 'Other',
+};
+const ROLE_LABEL_AR: Record<string, string> = {
+  RECEPTIONIST: 'موظف استقبال', ACCOUNTANT: 'محاسب',
+  MARKETING: 'تسويق', NURSE: 'ممرض', OTHER: 'أخرى',
+};
 
-interface StaffModalProps {
-  member: ClinicStaffMember | null;
-  onClose: () => void;
-}
+// ─── Staff Member Modal ───────────────────────────────────────────────────────
 
-function StaffMemberModal({ member, onClose }: StaffModalProps) {
+function StaffMemberModal({ member, isAr, onClose }: { member: ClinicStaffMember | null; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
   const isEdit = !!member;
   const [form, setForm] = useState({
     full_name: member?.full_name ?? '',
@@ -48,7 +63,7 @@ function StaffMemberModal({ member, onClose }: StaffModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
-    if (!form.full_name.trim()) { setSubmitError('الاسم مطلوب.'); return; }
+    if (!form.full_name.trim()) { setSubmitError(isAr ? 'الاسم مطلوب.' : 'Name is required.'); return; }
     try {
       if (isEdit && member) {
         await update.mutateAsync({ id: member.id, full_name: form.full_name.trim(), role: form.role, phone: form.phone.trim() || null, email: form.email.trim() || null, is_active: form.is_active });
@@ -57,64 +72,54 @@ function StaffMemberModal({ member, onClose }: StaffModalProps) {
       }
       onClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'حدث خطأ.');
+      setSubmitError(err instanceof Error ? err.message : (isAr ? 'حدث خطأ.' : 'An error occurred.'));
     }
   };
 
-  const fieldClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {isEdit ? 'تعديل موظف' : 'إضافة موظف'}
-          </h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 440 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {isEdit ? t.editStaff : t.addStaff}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الاسم *</label>
-            <input required value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} className={fieldClass} placeholder="اسم الموظف" />
+            <label className="ds-label">{t.fullName} *</label>
+            <input required className="ds-input" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} placeholder={isAr ? 'اسم الموظف' : 'Staff member name'} />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الوظيفة</label>
-            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as StaffRole }))} className={fieldClass}>
-              <option value="RECEPTIONIST">رسبشن</option>
-              <option value="ACCOUNTANT">محاسب</option>
-              <option value="MARKETING">ماركتنج</option>
-              <option value="NURSE">ممرض/ة</option>
-              <option value="OTHER">أخرى</option>
+            <label className="ds-label">{t.role}</label>
+            <select className="ds-input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as StaffRole }))}>
+              {STAFF_ROLES.map(r => <option key={r} value={r}>{isAr ? ROLE_LABEL_AR[r] : ROLE_LABEL_EN[r]}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الهاتف</label>
-              <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className={fieldClass} placeholder="01xxxxxxxxx" />
+              <label className="ds-label">{t.phone}</label>
+              <input type="tel" className="ds-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="01xxxxxxxxx" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الإيميل</label>
-              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={fieldClass} placeholder="staff@clinic.com" />
+              <label className="ds-label">{t.email}</label>
+              <input type="email" className="ds-input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="staff@clinic.com" />
             </div>
           </div>
-          <label className="flex cursor-pointer items-center gap-3">
-            <div className="relative">
-              <input type="checkbox" className="sr-only" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
-              <div className={`h-5 w-9 rounded-full transition-colors ${form.is_active ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-              <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${form.is_active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <div style={{ position: 'relative', width: 36, height: 20, flexShrink: 0 }}>
+              <input type="checkbox" style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
+              <div style={{ position: 'absolute', inset: 0, borderRadius: 20, background: form.is_active ? 'var(--p2)' : 'var(--brd2)', transition: 'background 0.2s' }} />
+              <div style={{ position: 'absolute', top: 2, left: form.is_active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
             </div>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">نشط</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--txt2)' }}>{t.active}</span>
           </label>
-          {submitError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">{submitError}</p>}
-          <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={isPending} className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-60 transition-opacity">
-              {isPending ? 'جاري الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إضافة الموظف'}
+          {submitError && <p className="ds-error">{submitError}</p>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : isEdit ? t.save : (isAr ? 'إضافة موظف' : 'Add Member')}
             </button>
-            <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
-              إلغاء
-            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
         </form>
       </div>
@@ -122,14 +127,10 @@ function StaffMemberModal({ member, onClose }: StaffModalProps) {
   );
 }
 
-// ─── Add / Edit Doctor Modal ──────────────────────────────────────────────────
+// ─── Doctor Modal ─────────────────────────────────────────────────────────────
 
-interface DoctorModalProps {
-  doctor: Doctor | null; // null = new
-  onClose: () => void;
-}
-
-function DoctorModal({ doctor, onClose }: DoctorModalProps) {
+function DoctorModal({ doctor, isAr, onClose }: { doctor: Doctor | null; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
   const isEdit = !!doctor;
   const [form, setForm] = useState({
     full_name: doctor?.full_name ?? '',
@@ -147,136 +148,61 @@ function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
-    if (!form.full_name.trim()) {
-      setSubmitError('Full name is required.');
-      return;
-    }
+    if (!form.full_name.trim()) { setSubmitError(isAr ? 'الاسم مطلوب.' : 'Full name is required.'); return; }
     try {
       if (isEdit && doctor) {
-        await update.mutateAsync({
-          id: doctor.id,
-          full_name: form.full_name.trim(),
-          specialization: form.specialization.trim() || null,
-          phone: form.phone.trim() || null,
-          email: form.email.trim() || null,
-          is_active: form.is_active,
-        });
+        await update.mutateAsync({ id: doctor.id, full_name: form.full_name.trim(), specialization: form.specialization.trim() || null, phone: form.phone.trim() || null, email: form.email.trim() || null, is_active: form.is_active });
       } else {
-        await create.mutateAsync({
-          full_name: form.full_name.trim(),
-          specialization: form.specialization.trim() || null,
-          phone: form.phone.trim() || null,
-          email: form.email.trim() || null,
-          is_active: form.is_active,
-        });
+        await create.mutateAsync({ full_name: form.full_name.trim(), specialization: form.specialization.trim() || null, phone: form.phone.trim() || null, email: form.email.trim() || null, is_active: form.is_active });
       }
       onClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'An error occurred.');
+      setSubmitError(err instanceof Error ? err.message : (isAr ? 'حدث خطأ.' : 'An error occurred.'));
     }
   };
 
-  const fieldClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {isEdit ? 'Edit Doctor' : 'Add Doctor'}
-          </h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 440 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {isEdit ? t.editDoctor : t.addDoctor}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Full Name *
-            </label>
-            <input
-              required
-              value={form.full_name}
-              onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-              className={fieldClass}
-              placeholder="Dr. Ahmed Mohamed"
-            />
+            <label className="ds-label">{t.fullName} *</label>
+            <input required className="ds-input" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} placeholder={isAr ? 'د. أحمد محمد' : 'Dr. Ahmed Mohamed'} />
           </div>
-
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Specialization
-            </label>
-            <input
-              value={form.specialization}
-              onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))}
-              className={fieldClass}
-              placeholder="e.g. Orthodontics, Endodontics"
-            />
+            <label className="ds-label">{t.specialization}</label>
+            <input className="ds-input" value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} placeholder={isAr ? 'مثال: تقويم، علاج جذور' : 'e.g. Orthodontics, Endodontics'} />
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Phone
-              </label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                className={fieldClass}
-                placeholder="01xxxxxxxxx"
-              />
+              <label className="ds-label">{t.phone}</label>
+              <input type="tel" className="ds-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="01xxxxxxxxx" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Email
-              </label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className={fieldClass}
-                placeholder="doctor@clinic.com"
-              />
+              <label className="ds-label">{t.email}</label>
+              <input type="email" className="ds-input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="doctor@clinic.com" />
             </div>
           </div>
-
-          <label className="flex cursor-pointer items-center gap-3">
-            <div className="relative">
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={form.is_active}
-                onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
-              />
-              <div className={`h-5 w-9 rounded-full transition-colors ${form.is_active ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-              <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${form.is_active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <div style={{ position: 'relative', width: 36, height: 20, flexShrink: 0 }}>
+              <input type="checkbox" style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
+              <div style={{ position: 'absolute', inset: 0, borderRadius: 20, background: form.is_active ? 'var(--p2)' : 'var(--brd2)', transition: 'background 0.2s' }} />
+              <div style={{ position: 'absolute', top: 2, left: form.is_active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
             </div>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Active</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--txt2)' }}>{t.active}</span>
           </label>
-
-          {submitError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-              {submitError}
-            </p>
-          )}
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-60 transition-opacity"
-            >
-              {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Doctor'}
+          {submitError && <p className="ds-error">{submitError}</p>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : isEdit ? t.save : t.addDoctor}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-            >
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
         </form>
       </div>
@@ -284,100 +210,51 @@ function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Doctor Card ──────────────────────────────────────────────────────────────
 
-interface StatCardProps {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number | string;
-  bg: string;
-  iconColor: string;
-}
-
-function StatCard({ icon: Icon, label, value, bg, iconColor }: StatCardProps) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
-        </div>
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${bg}`}>
-          <Icon className={`h-6 w-6 ${iconColor}`} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface DoctorCardProps {
-  doctor: Doctor;
-  apptCount: number;
-  billedAmount: number;
-  onEdit: (d: Doctor) => void;
-  onDelete: (d: Doctor) => void;
-}
-
-function DoctorCard({ doctor, apptCount, billedAmount, onEdit, onDelete }: DoctorCardProps) {
-  const initials = doctor.full_name
-    .split(' ')
-    .slice(0, 2)
-    .map(p => p.charAt(0))
-    .join('')
-    .toUpperCase();
+function DoctorCard({ doctor, apptCount, billedAmount, isAr, onEdit, onDelete, colorIdx }: {
+  doctor: Doctor; apptCount: number; billedAmount: number; isAr: boolean;
+  onEdit: (d: Doctor) => void; onDelete: (d: Doctor) => void; colorIdx: number;
+}) {
+  const t = useT(isAr);
+  const initials = doctor.full_name.split(' ').slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-start gap-4">
-        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-100 to-brand-200 text-lg font-bold text-brand-700 dark:from-brand-900/40 dark:to-brand-800/40 dark:text-brand-300">
+    <div className="ds-card" style={{ padding: '18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div className="ds-avatar" style={{ width: 50, height: 50, fontSize: 17, flexShrink: 0, background: DOCTOR_COLORS[colorIdx % DOCTOR_COLORS.length] }}>
           {initials}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="font-bold text-slate-900 dark:text-slate-100">{doctor.full_name}</p>
-              {doctor.specialization && (
-                <p className="text-xs text-slate-400 dark:text-slate-500">{doctor.specialization}</p>
-              )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doctor.full_name}</p>
+              {doctor.specialization && <p style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2 }}>{doctor.specialization}</p>}
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button
-                onClick={() => onEdit(doctor)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 transition-colors"
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => onDelete(doctor)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <button onClick={() => onEdit(doctor)} className="ds-icon-btn"><Edit2 size={13} /></button>
+              <button onClick={() => onDelete(doctor)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
             </div>
           </div>
-          {doctor.phone && (
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{doctor.phone}</p>
-          )}
+          {doctor.phone && <p style={{ fontSize: 12, color: 'var(--txt2)', marginTop: 4 }}>{doctor.phone}</p>}
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="flex-1 rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <CalendarDays className="h-3.5 w-3.5" />
-            Appointments
+      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, borderRadius: 10, background: 'var(--p-ultra)', padding: '10px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--txt3)', marginBottom: 4 }}>
+            <CalendarDays size={11} /> {t.appointments_count}
           </div>
-          <p className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100">{apptCount}</p>
+          <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--txt)' }}>{apptCount}</p>
         </div>
-        <div className="flex-1 rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <ReceiptText className="h-3.5 w-3.5" />
-            Billed
+        <div style={{ flex: 1, borderRadius: 10, background: 'var(--a-soft)', padding: '10px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--txt3)', marginBottom: 4 }}>
+            <ReceiptText size={11} /> {isAr ? 'مُحاسَب' : 'Billed'}
           </div>
-          <p className="mt-0.5 text-sm font-bold text-slate-900 dark:text-slate-100">{formatEGP(billedAmount)}</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{formatEGP(billedAmount)}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${doctor.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-          {doctor.is_active ? 'Active' : 'Inactive'}
+        <span className={doctor.is_active ? 'ds-badge ds-badge-ok' : 'ds-badge ds-badge-neutral'}>
+          {doctor.is_active ? t.active : t.inactive}
         </span>
       </div>
     </div>
@@ -386,15 +263,11 @@ function DoctorCard({ doctor, apptCount, billedAmount, onEdit, onDelete }: Docto
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const ROLE_LABEL: Record<string, string> = {
-  RECEPTIONIST: 'رسبشن',
-  ACCOUNTANT:   'محاسب',
-  MARKETING:    'ماركتنج',
-  NURSE:        'ممرض/ة',
-  OTHER:        'أخرى',
-};
-
 export function StaffPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [doctorModal, setDoctorModal] = useState<Doctor | null | 'new'>(null);
   const [staffModal, setStaffModal] = useState<ClinicStaffMember | null | 'new'>(null);
 
@@ -407,87 +280,88 @@ export function StaffPage() {
 
   const nonDoctors = staff.filter(s => s.role !== 'DOCTOR');
   const activeDoctors = doctors.filter(d => d.is_active).length;
-
   const isLoading = staffLoading || doctorsLoading || clinicStaffLoading;
-  const errorMessage = staffError instanceof Error ? staffError.message : 'Failed to load staff.';
+  const errorMessage = staffError instanceof Error ? staffError.message : (isAr ? 'فشل تحميل الفريق.' : 'Failed to load staff.');
 
   const handleDeleteDoctor = async (doctor: Doctor) => {
-    if (!confirm(`حذف د. ${doctor.full_name}؟ لا يمكن التراجع.`)) return;
+    if (!confirm(`${isAr ? 'حذف الطبيب' : 'Delete Dr.'} ${doctor.full_name}?`)) return;
     await deleteDoctor.mutateAsync(doctor.id);
   };
 
   const handleDeleteMember = async (m: ClinicStaffMember) => {
-    if (!confirm(`حذف ${m.full_name}؟ لا يمكن التراجع.`)) return;
+    if (!confirm(`${isAr ? 'حذف' : 'Delete'} ${m.full_name}?`)) return;
     await deleteMember.mutateAsync(m.id);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">الفريق</h1>
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              {doctors.length + clinicStaff.length} عضو
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStaffModal('new')}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Plus className="h-4 w-4" /> إضافة موظف
-            </button>
-            <button
-              onClick={() => setDoctorModal('new')}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-            >
-              <Plus className="h-4 w-4" /> إضافة طبيب
-            </button>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeIn 0.3s ease' }}>
+
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {doctors.length + clinicStaff.length} {isAr ? 'عضو' : 'members'}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setStaffModal('new')} className="ds-btn ds-btn-ghost" style={{ gap: 6 }}>
+            <Plus size={14} /> {t.addStaff}
+          </button>
+          <button onClick={() => setDoctorModal('new')} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addDoctor}
+          </button>
         </div>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          إدارة الدكاترة والموظفين.
-        </p>
       </div>
 
       {isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white py-16 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
-          </div>
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
         </div>
       ) : staffError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        <div className="ds-card" style={{ padding: 18, background: 'var(--err-soft)', border: '1px solid var(--err)', color: 'var(--err)' }}>
           {errorMessage}
         </div>
       ) : (
         <>
           {/* Stat cards */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard icon={Users}       label="الموظفون"        value={clinicStaff.length} bg="bg-slate-100 dark:bg-slate-800"   iconColor="text-slate-600 dark:text-slate-300" />
-            <StatCard icon={Stethoscope} label="الدكاترة"        value={doctors.length}     bg="bg-brand-50 dark:bg-brand-900/20"  iconColor="text-brand-600 dark:text-brand-400" />
-            <StatCard icon={UserCog}     label="دكاترة نشطون"   value={activeDoctors}      bg="bg-green-50 dark:bg-green-900/20"  iconColor="text-green-600 dark:text-green-400" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            {[
+              { icon: Users,       label: isAr ? 'الموظفون' : 'Staff Members', value: clinicStaff.length, cls: 'ds-stat-neutral' },
+              { icon: Stethoscope, label: isAr ? 'الأطباء'  : 'Doctors',        value: doctors.length,     cls: 'ds-stat-p' },
+              { icon: UserCog,     label: isAr ? 'أطباء نشطون' : 'Active Doctors', value: activeDoctors,   cls: 'ds-stat-ok' },
+            ].map(item => (
+              <div key={item.label} className={`ds-stat ${item.cls}`}>
+                <div className="ds-stat-icon"><item.icon size={18} /></div>
+                <div>
+                  <div className="ds-stat-label">{item.label}</div>
+                  <div className="ds-stat-value">{item.value}</div>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Doctor cards */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الدكاترة</h2>
-              <button onClick={() => setDoctorModal('new')} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
-                <Plus className="h-3.5 w-3.5" /> إضافة طبيب
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--txt3)', margin: 0 }}>
+                {isAr ? 'الأطباء' : 'Doctors'}
+              </h2>
+              <button onClick={() => setDoctorModal('new')} className="ds-btn ds-btn-ghost" style={{ gap: 5, padding: '5px 10px', fontSize: 11 }}>
+                <Plus size={12} /> {t.addDoctor}
               </button>
             </div>
             {doctors.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <Stethoscope className="mx-auto mb-3 h-9 w-9 text-slate-300 dark:text-slate-600" />
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">لا يوجد دكاترة بعد.</p>
+              <div className="ds-empty" style={{ padding: '40px 24px' }}>
+                <Stethoscope size={36} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+                <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{isAr ? 'لم يتم إضافة أطباء بعد.' : 'No doctors added yet.'}</p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {doctors.map(doc => (
-                  <DoctorCard key={doc.id} doctor={doc}
+              <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+                {doctors.map((doc, idx) => (
+                  <DoctorCard
+                    key={doc.id}
+                    doctor={doc}
+                    colorIdx={idx}
+                    isAr={isAr}
                     apptCount={statsData?.apptCounts.get(doc.id) ?? 0}
                     billedAmount={statsData?.billedAmounts.get(doc.id) ?? 0}
                     onEdit={(d) => setDoctorModal(d)}
@@ -499,61 +373,58 @@ export function StaffPage() {
           </div>
 
           {/* Clinic Staff table */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الموظفون</h2>
-              <button onClick={() => setStaffModal('new')} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
-                <Plus className="h-3.5 w-3.5" /> إضافة موظف
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--txt3)', margin: 0 }}>
+                {isAr ? 'موظفو العيادة' : 'Staff Members'}
+              </h2>
+              <button onClick={() => setStaffModal('new')} className="ds-btn ds-btn-ghost" style={{ gap: 5, padding: '5px 10px', fontSize: 11 }}>
+                <Plus size={12} /> {t.addStaff}
               </button>
             </div>
             {clinicStaff.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <Users className="mx-auto mb-3 h-9 w-9 text-slate-300 dark:text-slate-600" />
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">لا يوجد موظفون بعد.</p>
-                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">اضغط "إضافة موظف" لإضافة رسبشن أو محاسب أو غيره.</p>
+              <div className="ds-empty" style={{ padding: '40px 24px' }}>
+                <Users size={36} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+                <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{isAr ? 'لم يتم إضافة موظفين بعد.' : 'No staff members added yet.'}</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <table className="w-full text-sm">
+              <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table className="ds-table">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الاسم</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الهاتف</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الوظيفة</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الحالة</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">إجراءات</th>
+                    <tr>
+                      <th className="ds-th">{t.name}</th>
+                      <th className="ds-th">{t.phone}</th>
+                      <th className="ds-th">{t.role}</th>
+                      <th className="ds-th">{t.status}</th>
+                      <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {clinicStaff.map((m) => (
-                      <tr key={m.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <tr key={m.id} className="ds-tbody-row">
+                        <td className="ds-td">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div className="ds-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
                               {m.full_name.split(' ').slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase()}
                             </div>
-                            <p className="font-semibold text-slate-900 dark:text-slate-100">{m.full_name}</p>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{m.full_name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{m.phone ?? '—'}</td>
-                        <td className="px-6 py-4">
-                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[m.role] ?? ''}`}>
-                            {ROLE_LABEL[m.role] ?? m.role}
+                        <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{m.phone ?? '—'}</td>
+                        <td className="ds-td">
+                          <span className={ROLE_CLS[m.role] ?? 'ds-badge ds-badge-neutral'}>
+                            {isAr ? (ROLE_LABEL_AR[m.role] ?? m.role) : (ROLE_LABEL_EN[m.role] ?? m.role)}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${m.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                            {m.is_active ? 'نشط' : 'غير نشط'}
+                        <td className="ds-td">
+                          <span className={m.is_active ? 'ds-badge ds-badge-ok' : 'ds-badge ds-badge-neutral'}>
+                            {m.is_active ? t.active : t.inactive}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => setStaffModal(m)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 transition-colors">
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => handleDeleteMember(m)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                        <td className="ds-td">
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                            <button onClick={() => setStaffModal(m)} className="ds-icon-btn"><Edit2 size={13} /></button>
+                            <button onClick={() => handleDeleteMember(m)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
                           </div>
                         </td>
                       </tr>
@@ -564,38 +435,40 @@ export function StaffPage() {
             )}
           </div>
 
-          {/* Auth-based staff (read-only) */}
+          {/* System accounts (read-only) */}
           {nonDoctors.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">حسابات النظام</h2>
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <table className="w-full text-sm">
+            <div>
+              <h2 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--txt3)', marginBottom: 12 }}>
+                {isAr ? 'حسابات النظام' : 'System Accounts'}
+              </h2>
+              <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table className="ds-table">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الاسم</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الهاتف</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الصلاحية</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">الحالة</th>
+                    <tr>
+                      <th className="ds-th">{t.name}</th>
+                      <th className="ds-th">{t.phone}</th>
+                      <th className="ds-th">{t.role}</th>
+                      <th className="ds-th">{t.status}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {nonDoctors.map((s: Profile) => (
-                      <tr key={s.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <tr key={s.id} className="ds-tbody-row">
+                        <td className="ds-td">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div className="ds-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
                               {s.full_name.split(' ').slice(0, 2).map((p: string) => p.charAt(0)).join('').toUpperCase()}
                             </div>
-                            <p className="font-semibold text-slate-900 dark:text-slate-100">{s.full_name}</p>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{s.full_name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{s.phone ?? '—'}</td>
-                        <td className="px-6 py-4">
-                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[s.role] ?? ''}`}>{s.role}</span>
+                        <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{s.phone ?? '—'}</td>
+                        <td className="ds-td">
+                          <span className={ROLE_CLS[s.role] ?? 'ds-badge ds-badge-neutral'}>{s.role}</span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                            {s.is_active ? 'نشط' : 'غير نشط'}
+                        <td className="ds-td">
+                          <span className={s.is_active ? 'ds-badge ds-badge-ok' : 'ds-badge ds-badge-neutral'}>
+                            {s.is_active ? t.active : t.inactive}
                           </span>
                         </td>
                       </tr>
@@ -609,10 +482,10 @@ export function StaffPage() {
       )}
 
       {doctorModal !== null && (
-        <DoctorModal doctor={doctorModal === 'new' ? null : doctorModal} onClose={() => setDoctorModal(null)} />
+        <DoctorModal doctor={doctorModal === 'new' ? null : doctorModal} isAr={isAr} onClose={() => setDoctorModal(null)} />
       )}
       {staffModal !== null && (
-        <StaffMemberModal member={staffModal === 'new' ? null : staffModal} onClose={() => setStaffModal(null)} />
+        <StaffMemberModal member={staffModal === 'new' ? null : staffModal} isAr={isAr} onClose={() => setStaffModal(null)} />
       )}
     </div>
   );

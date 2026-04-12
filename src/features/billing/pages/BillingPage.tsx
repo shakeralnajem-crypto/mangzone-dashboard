@@ -1,24 +1,27 @@
 import { useState } from 'react';
 import { ReceiptText, Download, Plus, X, TrendingUp, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useInvoices, useBillingStats, useCreateInvoice } from '@/hooks/useInvoices';
 import { usePatients } from '@/hooks/usePatients';
 import { formatEGP } from '@/lib/currency';
 import { exportToCsv } from '@/lib/exportCsv';
+import { useT, getStatusLabel } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
 
-const INV_STATUS_COLORS: Record<string, string> = {
-  PAID:           'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  UNPAID:         'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  PARTIALLY_PAID: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  DRAFT:          'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-  CANCELLED:      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+const INV_STATUS_CLS: Record<string, string> = {
+  PAID:           'ds-badge ds-badge-ok',
+  UNPAID:         'ds-badge ds-badge-warn',
+  PARTIALLY_PAID: 'ds-badge ds-badge-a',
+  DRAFT:          'ds-badge ds-badge-neutral',
+  CANCELLED:      'ds-badge ds-badge-err',
 };
 
 // ─── Add Invoice Modal ────────────────────────────────────────────────────────
 
-function AddInvoiceModal({ invoiceCount, onClose }: { invoiceCount: number; onClose: () => void }) {
+function AddInvoiceModal({ invoiceCount, isAr, onClose }: { invoiceCount: number; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
   const { data: patients = [] } = usePatients('');
   const create = useCreateInvoice();
 
@@ -62,7 +65,10 @@ function AddInvoiceModal({ invoiceCount, onClose }: { invoiceCount: number; onCl
     setSubmitError('');
     const total = parseFloat(form.total_amount);
     const balance = parseFloat(form.balance_due);
-    if (isNaN(total) || total <= 0) { setSubmitError('Total amount must be greater than 0.'); return; }
+    if (isNaN(total) || total <= 0) {
+      setSubmitError(isAr ? 'يجب أن يكون الإجمالي أكبر من 0.' : 'Total amount must be greater than 0.');
+      return;
+    }
     try {
       await create.mutateAsync({
         patient_id: form.patient_id || null,
@@ -77,95 +83,82 @@ function AddInvoiceModal({ invoiceCount, onClose }: { invoiceCount: number; onCl
       });
       onClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to create invoice.');
+      setSubmitError(err instanceof Error ? err.message : (isAr ? 'فشل إنشاء الفاتورة.' : 'Failed to create invoice.'));
     }
   };
 
-  const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">New Invoice</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 520 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>{t.addInvoice}</span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Patient</label>
-              <select value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))} className={field}>
-                <option value="">— No patient —</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
-              </select>
-            </div>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label className="ds-label">{t.patient}</label>
+            <select className="ds-input" value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}>
+              <option value="">{isAr ? '— بدون مريض —' : '— No patient —'}</option>
+              {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+            </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Invoice #</label>
-              <input value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} className={field} />
+              <label className="ds-label">{t.invoiceNumber}</label>
+              <input className="ds-input" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as typeof form.status }))} className={field}>
-                {(['DRAFT','UNPAID','PARTIALLY_PAID','PAID','CANCELLED'] as const).map(s => (
-                  <option key={s} value={s}>{s.replace('_', ' ')}</option>
+              <label className="ds-label">{t.status}</label>
+              <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as typeof form.status }))}>
+                {(['DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'] as const).map(s => (
+                  <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Subtotal (EGP)</label>
-              <input type="number" min="0" step="0.01" value={form.subtotal} onChange={e => handleSubtotalChange(e.target.value)} placeholder="0" className={field} />
+              <label className="ds-label">{t.subtotal} (EGP)</label>
+              <input type="number" min="0" step="0.01" className="ds-input" value={form.subtotal} onChange={e => handleSubtotalChange(e.target.value)} placeholder="0" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Discount (EGP)</label>
-              <input type="number" min="0" step="0.01" value={form.discount} onChange={e => handleDiscountChange(e.target.value)} className={field} />
+              <label className="ds-label">{t.discount} (EGP)</label>
+              <input type="number" min="0" step="0.01" className="ds-input" value={form.discount} onChange={e => handleDiscountChange(e.target.value)} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Total *
-                {autoTotal > 0 && <span className="ml-1 text-brand-500 font-normal normal-case">(auto: {autoTotal})</span>}
+              <label className="ds-label">
+                {t.grandTotal} *{autoTotal > 0 && <span style={{ color: 'var(--p3)', fontWeight: 400, marginLeft: 4 }}>({autoTotal})</span>}
               </label>
-              <input required type="number" min="0.01" step="0.01" value={form.total_amount} onChange={e => handleTotalChange(e.target.value)} className={field} />
+              <input required type="number" min="0.01" step="0.01" className="ds-input" value={form.total_amount} onChange={e => handleTotalChange(e.target.value)} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Balance Due (EGP)</label>
-              <input type="number" min="0" step="0.01" value={form.balance_due} onChange={e => setForm(f => ({ ...f, balance_due: e.target.value }))} className={field} />
+              <label className="ds-label">{isAr ? 'الرصيد المستحق (ج.م)' : 'Balance Due (EGP)'}</label>
+              <input type="number" min="0" step="0.01" className="ds-input" value={form.balance_due} onChange={e => setForm(f => ({ ...f, balance_due: e.target.value }))} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Due Date</label>
-              <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className={field} />
+              <label className="ds-label">{t.dueDate}</label>
+              <input type="date" className="ds-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Notes</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className={`${field} resize-none`} />
+            <label className="ds-label">{t.notes}</label>
+            <textarea className="ds-input" style={{ resize: 'none' }} rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
 
-          {submitError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">{submitError}</p>
-          )}
+          {submitError && <p className="ds-error">{submitError}</p>}
 
-          <div className="flex gap-2 pt-1">
-            <button type="submit" disabled={create.isPending}
-              className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-60 transition-opacity">
-              {create.isPending ? 'Saving...' : 'Create Invoice'}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={create.isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {create.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.addInvoice}
             </button>
-            <button type="button" onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
         </form>
       </div>
@@ -176,10 +169,14 @@ function AddInvoiceModal({ invoiceCount, onClose }: { invoiceCount: number; onCl
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function BillingPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [addOpen, setAddOpen] = useState(false);
   const { data: invoices = [], isLoading, error } = useInvoices();
   const { data: stats } = useBillingStats();
-  const errorMessage = error instanceof Error ? error.message : 'Failed to load invoices.';
+  const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل الفواتير.' : 'Failed to load invoices.');
 
   const handleExport = () => {
     exportToCsv('invoices', invoices.map(inv => ({
@@ -194,71 +191,39 @@ export function BillingPage() {
   };
 
   const statCards = [
-    {
-      label: "Today's Revenue",
-      value: formatEGP(stats?.todayRevenue ?? 0),
-      icon: TrendingUp,
-      color: 'bg-gradient-to-br from-emerald-400 to-teal-500',
-    },
-    {
-      label: "This Month's Revenue",
-      value: formatEGP(stats?.monthRevenue ?? 0),
-      icon: Clock,
-      color: 'bg-gradient-to-br from-indigo-500 to-purple-600',
-    },
-    {
-      label: 'Pending Amount',
-      value: formatEGP(stats?.pendingAmount ?? 0),
-      icon: AlertTriangle,
-      color: 'bg-gradient-to-br from-amber-400 to-orange-500',
-    },
-    {
-      label: 'Total Invoices',
-      value: stats?.totalInvoices ?? '—',
-      icon: FileText,
-      color: 'bg-gradient-to-br from-blue-400 to-cyan-500',
-    },
+    { label: isAr ? 'إيرادات اليوم'  : "Today's Revenue",      value: formatEGP(stats?.todayRevenue ?? 0),  Icon: TrendingUp,    cls: 'ds-stat-ok' },
+    { label: isAr ? 'إيرادات الشهر'  : "This Month's Revenue", value: formatEGP(stats?.monthRevenue ?? 0),  Icon: Clock,         cls: 'ds-stat-p' },
+    { label: isAr ? 'المبلغ المعلق'  : 'Pending Amount',       value: formatEGP(stats?.pendingAmount ?? 0), Icon: AlertTriangle,  cls: 'ds-stat-warn' },
+    { label: isAr ? 'إجمالي الفواتير': 'Total Invoices',       value: String(stats?.totalInvoices ?? '—'),  Icon: FileText,      cls: 'ds-stat-a' },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Billing</h1>
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {invoices.length} total
-              </span>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Review invoice records, patient billing totals, and payment status.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button onClick={handleExport}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
-              <Download className="h-4 w-4" /> Export CSV
-            </button>
-            <button onClick={() => setAddOpen(true)}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity">
-              <Plus className="h-4 w-4" /> Add Invoice
-            </button>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeIn 0.3s ease' }}>
+
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {invoices.length} {isAr ? 'فاتورة' : 'invoices'}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={handleExport} className="ds-btn ds-btn-ghost" style={{ gap: 6 }}>
+            <Download size={14} /> {isAr ? 'تصدير CSV' : 'Export CSV'}
+          </button>
+          <button onClick={() => setAddOpen(true)} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addInvoice}
+          </button>
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {/* Stat cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
         {statCards.map(card => (
-          <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-5 flex items-center gap-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${card.color}`}>
-              <card.icon className="h-6 w-6 text-white" />
-            </div>
+          <div key={card.label} className={`ds-stat ${card.cls}`}>
+            <div className="ds-stat-icon"><card.Icon size={18} /></div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{card.label}</p>
-              <p className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-tight">{card.value}</p>
+              <div className="ds-stat-label">{card.label}</div>
+              <div className="ds-stat-value">{card.value}</div>
             </div>
           </div>
         ))}
@@ -266,70 +231,69 @@ export function BillingPage() {
 
       {/* Invoice table */}
       {isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white py-16 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
-          </div>
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        <div className="ds-card" style={{ padding: 18, background: 'var(--err-soft)', border: '1px solid var(--err)', color: 'var(--err)' }}>
           {errorMessage}
         </div>
       ) : invoices.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <ReceiptText className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-base font-medium text-slate-700 dark:text-slate-200">No invoices found.</p>
-          <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">Click "Add Invoice" to create the first one.</p>
-          <button onClick={() => setAddOpen(true)}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity">
-            <Plus className="h-4 w-4" /> Add Invoice
+        <div className="ds-empty">
+          <ReceiptText size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--txt)', marginBottom: 6 }}>{t.noInvoicesFound}</p>
+          <p style={{ fontSize: 13, color: 'var(--txt3)', marginBottom: 16 }}>{t.addFirstInvoice}</p>
+          <button onClick={() => setAddOpen(true)} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addInvoice}
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <table className="w-full text-sm">
+        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="ds-table">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Invoice</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Patient</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Total</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Due Date</th>
+              <tr>
+                <th className="ds-th">{isAr ? 'الفاتورة' : 'Invoice'}</th>
+                <th className="ds-th">{t.patient}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.total}</th>
+                <th className="ds-th">{t.status}</th>
+                <th className="ds-th">{t.dueDate}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                  <td className="px-6 py-4">
-                    <p className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">{inv.invoice_number || '—'}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                <tr key={inv.id} className="ds-tbody-row">
+                  <td className="ds-td">
+                    <p style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: 'var(--txt)' }}>
+                      {inv.invoice_number || '—'}
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
                       {new Date(inv.created_at).toLocaleDateString('en-EG', { dateStyle: 'medium' })}
                     </p>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="ds-td">
                     {inv.patient ? (
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="ds-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
                           {inv.patient.first_name.charAt(0)}{inv.patient.last_name.charAt(0)}
                         </div>
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
                           {inv.patient.first_name} {inv.patient.last_name}
-                        </p>
+                        </span>
                       </div>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500">—</span>
+                      <span style={{ color: 'var(--txt3)' }}>—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{formatEGP(inv.total_amount)}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">Balance: {formatEGP(inv.balance_due)}</p>
+                  <td className="ds-td" style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt)' }}>{formatEGP(inv.total_amount)}</p>
+                    <p style={{ fontSize: 11, color: 'var(--txt3)' }}>{isAr ? 'الرصيد:' : 'Balance:'} {formatEGP(inv.balance_due)}</p>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${INV_STATUS_COLORS[inv.status ?? 'UNPAID'] ?? ''}`}>
-                      {(inv.status ?? 'UNPAID').replace('_', ' ')}
+                  <td className="ds-td">
+                    <span className={INV_STATUS_CLS[inv.status ?? 'UNPAID'] ?? 'ds-badge ds-badge-neutral'}>
+                      {getStatusLabel(inv.status ?? 'UNPAID', isAr)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                  <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>
                     {inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-EG', { dateStyle: 'medium' }) : '—'}
                   </td>
                 </tr>
@@ -339,9 +303,7 @@ export function BillingPage() {
         </div>
       )}
 
-      {addOpen && (
-        <AddInvoiceModal invoiceCount={invoices.length} onClose={() => setAddOpen(false)} />
-      )}
+      {addOpen && <AddInvoiceModal invoiceCount={invoices.length} isAr={isAr} onClose={() => setAddOpen(false)} />}
     </div>
   );
 }

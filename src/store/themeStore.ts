@@ -12,8 +12,10 @@ function applyTheme(theme: Theme) {
   const root = document.documentElement;
   if (theme === 'dark') {
     root.classList.add('dark');
+    root.setAttribute('data-theme', 'dark');
   } else {
     root.classList.remove('dark');
+    root.setAttribute('data-theme', 'light');
   }
   localStorage.setItem('mangzone-theme', theme);
 }

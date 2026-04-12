@@ -1,75 +1,77 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  LayoutDashboard,
-  Users,
-  CalendarDays,
-  ClipboardList,
-  ReceiptText,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  BarChart3,
-  UserCog,
-  ChevronDown,
-  Megaphone,
-  Sun,
-  Moon,
-  Calculator,
-  Share2,
-  PhoneCall,
-  Stethoscope,
+  LayoutDashboard, Users, CalendarDays, ClipboardList, ReceiptText,
+  Settings, LogOut, Menu, X, BarChart3, UserCog, Megaphone,
+  Sun, Moon, Calculator, Share2, PhoneCall, Stethoscope, Plus,
+  MoreHorizontal,
 } from 'lucide-react';
-import { BrandLogo } from '@/components/shared/BrandLogo';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { authApi } from '@/features/auth/api/auth.api';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/translations';
 import type { UserRole } from '@/types';
 
 interface NavItem {
-  key: string;
+  label_en: string;
+  label_ar: string;
   icon: React.ComponentType<{ className?: string }>;
   to: string;
   roles: UserRole[];
 }
 
 const navItems: NavItem[] = [
-  { key: 'nav.dashboard',    icon: LayoutDashboard, to: '/dashboard',    roles: ['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'ACCOUNTANT'] },
-  { key: 'nav.appointments', icon: CalendarDays,    to: '/appointments', roles: ['ADMIN', 'DOCTOR', 'RECEPTIONIST'] },
-  { key: 'nav.patients',     icon: Users,           to: '/patients',     roles: ['ADMIN', 'DOCTOR', 'RECEPTIONIST'] },
-  { key: 'nav.leads',        icon: Megaphone,       to: '/leads',        roles: ['ADMIN', 'RECEPTIONIST'] },
-  { key: 'nav.treatments',   icon: ClipboardList,   to: '/treatments',   roles: ['ADMIN', 'DOCTOR'] },
-  { key: 'nav.billing',      icon: ReceiptText,     to: '/billing',      roles: ['ADMIN', 'ACCOUNTANT', 'RECEPTIONIST'] },
-  { key: 'nav.followup',     icon: PhoneCall,       to: '/followup',     roles: ['ADMIN', 'RECEPTIONIST'] },
-  { key: 'nav.reports',      icon: BarChart3,       to: '/reports',      roles: ['ADMIN', 'ACCOUNTANT'] },
-  { key: 'nav.accounting',   icon: Calculator,      to: '/accounting',   roles: ['ADMIN', 'ACCOUNTANT'] },
-  { key: 'nav.content',      icon: Share2,          to: '/content',      roles: ['ADMIN'] },
-  { key: 'nav.services',     icon: Stethoscope,     to: '/services',     roles: ['ADMIN'] },
-  { key: 'nav.staff',        icon: UserCog,         to: '/staff',        roles: ['ADMIN'] },
-  { key: 'nav.settings',     icon: Settings,        to: '/settings',     roles: ['ADMIN'] },
+  { label_en: 'Dashboard',      label_ar: 'لوحة التحكم',      icon: LayoutDashboard, to: '/dashboard',    roles: ['ADMIN','DOCTOR','RECEPTIONIST','ACCOUNTANT'] },
+  { label_en: 'Appointments',   label_ar: 'المواعيد',          icon: CalendarDays,    to: '/appointments', roles: ['ADMIN','DOCTOR','RECEPTIONIST'] },
+  { label_en: 'Patients',       label_ar: 'المرضى',            icon: Users,           to: '/patients',     roles: ['ADMIN','DOCTOR','RECEPTIONIST'] },
+  { label_en: 'Leads',          label_ar: 'العملاء المحتملون', icon: Megaphone,       to: '/leads',        roles: ['ADMIN','RECEPTIONIST'] },
+  { label_en: 'Treatments',     label_ar: 'خطط العلاج',        icon: ClipboardList,   to: '/treatments',   roles: ['ADMIN','DOCTOR'] },
+  { label_en: 'Billing',        label_ar: 'الفواتير',          icon: ReceiptText,     to: '/billing',      roles: ['ADMIN','ACCOUNTANT','RECEPTIONIST'] },
+  { label_en: 'Follow-up',      label_ar: 'المتابعة',          icon: PhoneCall,       to: '/followup',     roles: ['ADMIN','RECEPTIONIST'] },
+  { label_en: 'Reports',        label_ar: 'التقارير',          icon: BarChart3,       to: '/reports',      roles: ['ADMIN','ACCOUNTANT'] },
+  { label_en: 'Accounting',     label_ar: 'المحاسبة',          icon: Calculator,      to: '/accounting',   roles: ['ADMIN','ACCOUNTANT'] },
+  { label_en: 'Services',       label_ar: 'الخدمات',           icon: Stethoscope,     to: '/services',     roles: ['ADMIN'] },
+  { label_en: 'Team',           label_ar: 'الفريق',            icon: UserCog,         to: '/staff',        roles: ['ADMIN'] },
+  { label_en: 'Content',        label_ar: 'المحتوى',           icon: Share2,          to: '/content',      roles: ['ADMIN'] },
+  { label_en: 'Settings',       label_ar: 'الإعدادات',         icon: Settings,        to: '/settings',     roles: ['ADMIN'] },
 ];
 
-function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const { profile, clearAuth } = useAuthStore();
-  const isRtl = i18n.language === 'ar';
+const navGroups = [
+  { label_en: 'MAIN',       label_ar: 'الرئيسية',  paths: ['/dashboard','/appointments','/patients','/leads'] },
+  { label_en: 'MANAGEMENT', label_ar: 'الإدارة',   paths: ['/treatments','/billing','/followup','/reports','/accounting'] },
+  { label_en: 'SETTINGS',   label_ar: 'الإعدادات', paths: ['/services','/staff','/content','/settings'] },
+];
 
-  const allowedNav = navItems.filter(
-    (item) => profile?.role && item.roles.includes(profile.role)
-  );
+const pageMeta: Record<string, { en: string; ar: string; sub_en: string; sub_ar: string }> = {
+  '/dashboard':    { en: 'Dashboard',       ar: 'لوحة التحكم',        sub_en: 'Clinic overview & stats',          sub_ar: 'نظرة عامة على العيادة' },
+  '/appointments': { en: 'Appointments',    ar: 'المواعيد',            sub_en: 'Manage patient appointments',       sub_ar: 'إدارة مواعيد المرضى' },
+  '/patients':     { en: 'Patients',        ar: 'المرضى',              sub_en: 'Patient records & files',           sub_ar: 'سجلات وملفات المرضى' },
+  '/leads':        { en: 'Leads',           ar: 'العملاء المحتملون',   sub_en: 'Track new enquiries',               sub_ar: 'متابعة الاستفسارات الجديدة' },
+  '/treatments':   { en: 'Treatments',      ar: 'خطط العلاج',          sub_en: 'Monitor treatment progress',        sub_ar: 'متابعة مسار العلاج' },
+  '/billing':      { en: 'Billing',         ar: 'الفواتير',            sub_en: 'Invoices & payments',               sub_ar: 'إدارة الفواتير والمدفوعات' },
+  '/followup':     { en: 'Follow-up',       ar: 'المتابعة',            sub_en: 'Post-visit patient follow-up',      sub_ar: 'متابعة المرضى بعد الزيارة' },
+  '/reports':      { en: 'Reports',         ar: 'التقارير',            sub_en: 'Clinic performance analytics',      sub_ar: 'تحليل أداء العيادة' },
+  '/accounting':   { en: 'Accounting',      ar: 'المحاسبة',            sub_en: 'Expenses & revenue',                sub_ar: 'المصروفات والإيرادات' },
+  '/content':      { en: 'Content',         ar: 'المحتوى',             sub_en: 'Social media management',           sub_ar: 'إدارة منصات التواصل الاجتماعي' },
+  '/services':     { en: 'Services',        ar: 'الخدمات',             sub_en: 'Clinic service catalogue',          sub_ar: 'قائمة خدمات العيادة' },
+  '/staff':        { en: 'Team',            ar: 'الفريق',              sub_en: 'Doctors & staff members',           sub_ar: 'الأطباء والموظفون' },
+  '/settings':     { en: 'Settings',        ar: 'الإعدادات',           sub_en: 'Account & system settings',        sub_ar: 'إعدادات الحساب والنظام' },
+};
+
+function Sidebar({ onClose }: { onClose?: () => void }) {
+  const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const { profile, clearAuth } = useAuthStore();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
+  const allowedNav = navItems.filter(item => profile?.role && item.roles.includes(profile.role));
 
   const handleLogout = async () => {
     await authApi.logout();
@@ -77,89 +79,72 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
     navigate('/login', { replace: true });
   };
 
-  const initials = profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() ?? 'MZ';
+  const initials = profile?.full_name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() ?? 'MZ';
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-white dark:bg-slate-900 border-e border-slate-200 dark:border-slate-700">
-      {/* Brand header */}
-      <div className="flex h-16 items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800">
-        <BrandLogo size="sm" />
+    <aside style={{ width: 190, flexShrink: 0, background: 'var(--bg2)', borderRight: '1px solid var(--brd)', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Logo */}
+      <div style={{ padding: '0 10px', borderBottom: '1px solid var(--brd)', overflow: 'hidden' }}>
+        <img
+          src="/logo.png"
+          alt="MANGZONE"
+          style={{ width: '100%', height: 'auto', maxHeight: 200, objectFit: 'contain', display: 'block', margin: '-30px 0 -42px' }}
+          draggable={false}
+        />
         {onClose && (
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X className="h-5 w-5" />
+          <button onClick={onClose} style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--txt3)', padding: 4, borderRadius: 8, border: '1px solid var(--brd)', background: 'transparent', cursor: 'pointer', display: 'flex' }} className="lg:hidden">
+            <X size={16} />
           </button>
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {allowedNav.map(({ key, icon: Icon, to }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={onClose}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                isRtl ? 'flex-row-reverse text-right' : '',
-                isActive
-                  ? 'bg-gradient-to-r from-indigo-50 to-fuchsia-50 dark:from-indigo-900/30 dark:to-fuchsia-900/20 text-brand-700 dark:text-brand-400 border border-brand-100 dark:border-brand-800'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon
-                  className={cn(
-                    'h-4 w-4 flex-shrink-0',
-                    isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500'
-                  )}
-                />
-                <span>{t(key)}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
+      {/* Nav */}
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
+        {navGroups.map(group => {
+          const items = allowedNav.filter(item => group.paths.includes(item.to));
+          if (!items.length) return null;
+          return (
+            <div key={group.label_en} style={{ marginBottom: 8 }}>
+              <div className="sidebar-group-label">{isAr ? group.label_ar : group.label_en}</div>
+              {items.map(({ label_en, label_ar, icon: Icon, to }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={onClose}
+                  className={({ isActive }) => cn('sidebar-nav-item', isActive && 'active')}
+                >
+                  <Icon className="sidebar-nav-icon" />
+                  <span>{isAr ? label_ar : label_en}</span>
+                </NavLink>
+              ))}
+            </div>
+          );
+        })}
       </nav>
 
-      {/* User section */}
-      <div className="border-t border-slate-100 dark:border-slate-800 p-3">
+      {/* User card */}
+      <div style={{ padding: 14, borderTop: '1px solid var(--brd)' }}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 text-start min-w-0">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{profile?.full_name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{profile?.role && t(`role.${profile.role}`)}</p>
+            <button style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--p-ultra)', border: '1px solid var(--brd)', cursor: 'pointer', transition: 'all 0.2s ease' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--p-soft)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--p-ultra)'; }}
+            >
+              <div className="ds-avatar" style={{ width: 34, height: 34, fontSize: 13 }}>{initials}</div>
+              <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile?.full_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--txt3)' }}>{profile?.role}</div>
               </div>
-              <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
+              <MoreHorizontal size={15} style={{ color: 'var(--txt3)', flexShrink: 0 }} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-52">
-            <DropdownMenuLabel>{t('common.profile')}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent side="top" align="start" className="w-48">
             <DropdownMenuItem onClick={() => navigate('/settings')}>
-              <Settings className="h-4 w-4" />
-              {t('nav.settings')}
+              <Settings className="h-4 w-4 mr-2" /> {t.settings}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLogout}
-              className="text-red-600 focus:text-red-600 focus:bg-red-50"
-            >
-              <LogOut className="h-4 w-4" />
-              {t('common.logout')}
+            <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+              <LogOut className="h-4 w-4 mr-2" /> {isAr ? 'تسجيل الخروج' : 'Log out'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -170,84 +155,91 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
 export function AppLayout() {
   const { i18n } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, toggle: toggleTheme } = useThemeStore();
-  const isRtl = i18n.language === 'ar';
+  const isAr = i18n.language === 'ar';
+
+  const meta = pageMeta[location.pathname] ?? { en: 'MANGZONE', ar: 'MANGZONE', sub_en: '', sub_ar: '' };
+  const t = useT(isAr);
 
   useEffect(() => {
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
     document.documentElement.lang = i18n.language;
-    document.body.className = isRtl ? 'font-arabic' : 'font-sans';
-  }, [i18n.language, isRtl]);
-
-  const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'en' ? 'ar' : 'en');
-  };
+  }, [i18n.language, isAr]);
 
   return (
-    <div className={`flex h-screen w-full bg-slate-50 dark:bg-slate-950 ${isRtl ? 'font-arabic' : 'font-sans'}`}>
+    <div style={{ display: 'flex', height: '100vh', width: '100%', background: 'var(--bg)' }}>
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex">
+      <div className="hidden lg:flex" style={{ height: '100%' }}>
         <Sidebar />
       </div>
 
-      {/* Mobile sidebar overlay */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div className={cn('absolute inset-y-0 flex w-64', isRtl ? 'end-0' : 'start-0')}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 40, display: 'flex' }} className="lg:hidden">
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setSidebarOpen(false)} />
+          <div style={{ position: 'relative', display: 'flex', height: '100%' }}>
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </div>
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
-        {/* Top header */}
-        <header className="flex h-16 items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 lg:px-6 flex-shrink-0">
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <Menu className="h-5 w-5" />
+      {/* Main */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%', overflow: 'hidden' }}>
+        {/* Topbar */}
+        <header style={{
+          height: 64, flexShrink: 0,
+          background: theme === 'dark' ? 'rgba(19,13,36,0.78)' : 'rgba(255,255,255,0.72)',
+          backdropFilter: 'blur(18px)',
+          borderBottom: '1px solid var(--brd)',
+          display: 'flex', alignItems: 'center',
+          padding: '0 28px', gap: 12,
+          position: 'sticky', top: 0, zIndex: 30,
+        }}>
+          {/* Mobile menu */}
+          <button className="lg:hidden ds-icon-btn" onClick={() => setSidebarOpen(true)}>
+            <Menu size={18} />
           </button>
 
-          {/* Mobile logo */}
-          <div className="lg:hidden">
-            <BrandLogo size="sm" />
+          {/* Page title */}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--txt)', lineHeight: 1.2 }}>
+              {isAr ? meta.ar : meta.en}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--txt3)', marginTop: 1 }}>
+              {isAr ? meta.sub_ar : meta.sub_en}
+            </div>
           </div>
 
-          {/* Spacer (desktop) */}
-          <div className="hidden lg:flex flex-1" />
-
-          {/* Right side actions */}
-          <div className="flex items-center gap-2">
-            {/* Dark mode toggle */}
+          {/* Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Language */}
             <button
-              onClick={toggleTheme}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
+              className="ds-btn ds-btn-ghost"
+              style={{ padding: '7px 13px', fontSize: 12 }}
             >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {isAr ? 'EN' : 'عربي'}
             </button>
 
-            {/* Language toggle */}
-            <button
-              onClick={toggleLanguage}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
-            >
-              {i18n.language === 'en' ? 'عربي' : 'English'}
+            {/* Theme */}
+            <button className="ds-icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+
+            {/* Primary action */}
+            <button className="ds-btn ds-btn-primary" onClick={() => navigate('/appointments')}>
+              <Plus size={15} strokeWidth={2.5} />
+              {t.newAppointment}
             </button>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 lg:p-6">
+        <main style={{ flex: 1, overflow: 'auto', position: 'relative', zIndex: 1 }}>
+          <div style={{ padding: '28px 28px' }}>
             <Outlet />
           </div>
         </main>

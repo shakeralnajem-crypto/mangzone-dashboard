@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Search, UserCheck, Download, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePatients, useCreatePatient, useUpdatePatient, useDeletePatient } from '@/hooks/usePatients';
 import { PatientDetailModal } from '@/components/shared/PatientDetailModal';
 import { exportToCsv } from '@/lib/exportCsv';
+import { useT } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type Patient = Database['public']['Tables']['patients']['Row'];
@@ -19,12 +21,8 @@ const emptyForm = {
 
 // ─── Patient Modal ────────────────────────────────────────────────────────────
 
-interface PatientModalProps {
-  patient: Patient | null;
-  onClose: () => void;
-}
-
-function PatientModal({ patient, onClose }: PatientModalProps) {
+function PatientModal({ patient, isAr, onClose }: { patient: Patient | null; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
   const [form, setForm] = useState(
     patient
       ? {
@@ -46,7 +44,6 @@ function PatientModal({ patient, onClose }: PatientModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
-
     const payload: Partial<PatientInsert> = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
@@ -55,7 +52,6 @@ function PatientModal({ patient, onClose }: PatientModalProps) {
       dob: form.dob || null,
       notes: form.notes.trim() || null,
     };
-
     try {
       if (patient) {
         await update.mutateAsync({ id: patient.id, values: payload });
@@ -64,133 +60,72 @@ function PatientModal({ patient, onClose }: PatientModalProps) {
       }
       onClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
+      setSubmitError(err instanceof Error ? err.message : (isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'An error occurred. Please try again.'));
     }
   };
 
-  const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {patient ? 'Edit Patient' : 'Add New Patient'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 500 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {patient ? t.editPatient : t.addPatient}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                First Name *
-              </label>
-              <input
-                required
-                value={form.first_name}
-                onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))}
-                className={field}
-                placeholder="Ahmed"
-              />
+              <label className="ds-label">{isAr ? 'الاسم الأول *' : 'First Name *'}</label>
+              <input required className="ds-input" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} placeholder={isAr ? 'أحمد' : 'Ahmed'} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Last Name *
-              </label>
-              <input
-                required
-                value={form.last_name}
-                onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))}
-                className={field}
-                placeholder="Hassan"
-              />
+              <label className="ds-label">{isAr ? 'اسم العائلة *' : 'Last Name *'}</label>
+              <input required className="ds-input" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} placeholder={isAr ? 'حسن' : 'Hassan'} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Phone
-            </label>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className={field}
-              placeholder="01xxxxxxxxx"
-            />
+            <label className="ds-label">{t.phone}</label>
+            <input type="tel" className="ds-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="01xxxxxxxxx" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Gender
-              </label>
-              <select
-                value={form.gender}
-                onChange={e => setForm(f => ({ ...f, gender: e.target.value as typeof form.gender }))}
-                className={field}
-              >
-                <option value="">— Select —</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
+              <label className="ds-label">{t.gender}</label>
+              <select className="ds-input" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value as typeof form.gender }))}>
+                <option value="">{isAr ? '— اختر —' : '— Select —'}</option>
+                <option value="MALE">{t.male}</option>
+                <option value="FEMALE">{t.female}</option>
+                <option value="OTHER">{isAr ? 'أخرى' : 'Other'}</option>
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                value={form.dob}
-                onChange={e => setForm(f => ({ ...f, dob: e.target.value }))}
-                className={field}
-              />
+              <label className="ds-label">{t.dateOfBirth}</label>
+              <input type="date" className="ds-input" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Notes
-            </label>
+            <label className="ds-label">{t.notes}</label>
             <textarea
+              className="ds-input"
+              style={{ resize: 'none' }}
+              rows={3}
               value={form.notes}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={3}
-              className={`${field} resize-none`}
-              placeholder="Medical alerts, allergies, or other notes..."
+              placeholder={isAr ? 'تنبيهات طبية، حساسية، أو ملاحظات أخرى...' : 'Medical alerts, allergies, or other notes...'}
             />
           </div>
 
-          {submitError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-              {submitError}
-            </p>
-          )}
+          {submitError && <p className="ds-error">{submitError}</p>}
 
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-60 transition-opacity"
-            >
-              {isPending ? 'Saving...' : patient ? 'Save Changes' : 'Add Patient'}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : patient ? t.save : t.addPatient}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-            >
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
         </form>
       </div>
@@ -201,6 +136,10 @@ function PatientModal({ patient, onClose }: PatientModalProps) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function PatientsPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -209,7 +148,7 @@ export function PatientsPage() {
   const { data: patients = [], isLoading, error } = usePatients(search);
   const deletePatient = useDeletePatient();
 
-  const errorMessage = error instanceof Error ? error.message : 'Failed to load patients.';
+  const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المرضى.' : 'Failed to load patients.');
 
   const handleExport = () => {
     exportToCsv('patients', patients.map(p => ({
@@ -223,7 +162,7 @@ export function PatientsPage() {
   };
 
   const handleDelete = async (p: Patient) => {
-    if (!confirm(`Delete patient "${p.first_name} ${p.last_name}"? This cannot be undone.`)) return;
+    if (!confirm(`${isAr ? 'حذف المريض' : 'Delete patient'} "${p.first_name} ${p.last_name}"?`)) return;
     await deletePatient.mutateAsync(p.id);
   };
 
@@ -232,163 +171,126 @@ export function PatientsPage() {
   const closeModal = () => { setModalOpen(false); setEditingPatient(null); };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Patients</h1>
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {patients.length} total
-              </span>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Search the patient directory by full name or phone number.
-            </p>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeIn 0.3s ease' }}>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Download className="h-4 w-4" /> Export CSV
-            </button>
-            <button
-              onClick={openAdd}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-            >
-              <Plus className="h-4 w-4" /> Add Patient
-            </button>
-          </div>
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {patients.length} {isAr ? 'مريض' : 'patients'}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={handleExport} className="ds-btn ds-btn-ghost" style={{ gap: 6 }}>
+            <Download size={14} /> {isAr ? 'تصدير CSV' : 'Export CSV'}
+          </button>
+          <button onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addPatient}
+          </button>
         </div>
 
-        {/* Search */}
-        <div className="mt-4 relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div style={{ marginTop: 14, position: 'relative' }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--txt3)', pointerEvents: 'none' }} />
           <input
-            placeholder="Search by name or phone..."
+            placeholder={isAr ? 'بحث بالاسم أو الهاتف...' : 'Search by name or phone...'}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900"
+            className="ds-search"
+            style={{ paddingLeft: 36 }}
           />
         </div>
       </div>
 
-      {/* Content */}
       {isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white py-16 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
-          </div>
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        <div className="ds-card" style={{ padding: 18, background: 'var(--err-soft)', border: '1px solid var(--err)', color: 'var(--err)' }}>
           {errorMessage}
         </div>
       ) : patients.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <UserCheck className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-base font-medium text-slate-700 dark:text-slate-200">
-            {search ? 'No patients found.' : 'No patients yet.'}
+        <div className="ds-empty">
+          <UserCheck size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--txt)', marginBottom: 6 }}>
+            {search ? t.noPatientsFound : t.noPatientsFound}
           </p>
-          <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
-            {search ? 'Try another name or phone number.' : 'Click "Add Patient" to get started.'}
+          <p style={{ fontSize: 13, color: 'var(--txt3)', marginBottom: 16 }}>
+            {search ? (isAr ? 'جرب اسماً أو رقم هاتف آخر.' : 'Try another name or phone number.') : t.addFirstPatient}
           </p>
           {!search && (
-            <button
-              onClick={openAdd}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-            >
-              <Plus className="h-4 w-4" /> Add Patient
+            <button onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+              <Plus size={14} strokeWidth={2.5} /> {t.addPatient}
             </button>
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <table className="w-full text-sm">
+        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="ds-table">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Name
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Phone
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Gender
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Date of Birth
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                  Actions
-                </th>
+              <tr>
+                <th className="ds-th">{t.name}</th>
+                <th className="ds-th">{t.phone}</th>
+                <th className="ds-th">{t.gender}</th>
+                <th className="ds-th">{t.dateOfBirth}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {patients.map(p => (
-                <tr key={p.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-brand-200 text-sm font-semibold text-brand-700 dark:from-brand-900/40 dark:to-brand-800/40 dark:text-brand-300">
+                <tr key={p.id} className="ds-tbody-row">
+                  <td className="ds-td">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="ds-avatar" style={{ width: 36, height: 36, fontSize: 12, flexShrink: 0 }}>
                         {p.first_name.charAt(0)}{p.last_name.charAt(0)}
                       </div>
                       <div>
                         <button
                           onClick={() => setDetailPatient(p)}
-                          className="font-semibold text-brand-600 hover:text-brand-700 hover:underline dark:text-brand-400 dark:hover:text-brand-300 text-left transition-colors"
+                          style={{ fontSize: 13, fontWeight: 600, color: 'var(--p2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none'; }}
                         >
                           {p.first_name} {p.last_name}
                         </button>
                         {p.notes && (
-                          <p className="max-w-xs truncate text-xs text-slate-400 dark:text-slate-500">
+                          <p style={{ fontSize: 11, color: 'var(--txt3)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {p.notes}
                           </p>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                  <td className="ds-td">
                     {p.phone ? (
-                      <a
-                        href={`tel:${p.phone}`}
-                        className="font-medium text-slate-700 transition hover:text-brand-600 dark:text-slate-200 dark:hover:text-brand-400"
+                      <a href={`tel:${p.phone}`} style={{ fontSize: 13, fontWeight: 500, color: 'var(--txt2)', textDecoration: 'none' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--p2)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--txt2)'; }}
                       >
                         {p.phone}
                       </a>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500">—</span>
+                      <span style={{ color: 'var(--txt3)' }}>—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="ds-td">
                     {p.gender ? (
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        {p.gender}
+                      <span className="ds-badge ds-badge-neutral">
+                        {p.gender === 'MALE' ? t.male : p.gender === 'FEMALE' ? t.female : p.gender}
                       </span>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500">—</span>
+                      <span style={{ color: 'var(--txt3)' }}>—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                  <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>
                     {p.dob ? new Date(p.dob).toLocaleDateString('en-EG', { dateStyle: 'medium' }) : '—'}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => openEdit(p)}
-                        title="Edit patient"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-                      >
-                        <Edit2 className="h-4 w-4" />
+                  <td className="ds-td">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                      <button onClick={() => openEdit(p)} className="ds-icon-btn" title={t.edit}>
+                        <Edit2 size={14} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(p)}
-                        title="Delete patient"
-                        className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
+                      <button onClick={() => handleDelete(p)} className="ds-icon-btn-err" title={t.delete}>
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>
@@ -399,14 +301,8 @@ export function PatientsPage() {
         </div>
       )}
 
-      {modalOpen && (
-        <PatientModal patient={editingPatient} onClose={closeModal} />
-      )}
-
-      <PatientDetailModal
-        patient={detailPatient}
-        onClose={() => setDetailPatient(null)}
-      />
+      {modalOpen && <PatientModal patient={editingPatient} isAr={isAr} onClose={closeModal} />}
+      <PatientDetailModal patient={detailPatient} onClose={() => setDetailPatient(null)} />
     </div>
   );
 }

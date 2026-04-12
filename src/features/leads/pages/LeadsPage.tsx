@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Megaphone, Search, Plus, X, Edit2, UserCheck, Trash2, Phone, Download, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useLeads, useOverdueLeads, useCreateLead, useUpdateLead, useDeleteLead, useConvertLead } from '@/hooks/useLeads';
 import { exportToCsv } from '@/lib/exportCsv';
+import { useT, getStatusLabel } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 
-const STATUS_COLORS: Record<string, string> = {
-  NEW: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  CONTACTED: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  INTERESTED: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  CONVERTED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  LOST: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+const STATUS_CLS: Record<string, string> = {
+  NEW:        'ds-badge ds-badge-p',
+  CONTACTED:  'ds-badge ds-badge-warn',
+  INTERESTED: 'ds-badge ds-badge-a',
+  CONVERTED:  'ds-badge ds-badge-ok',
+  LOST:       'ds-badge ds-badge-err',
 };
 
 const STATUS_TABS = ['ALL', 'NEW', 'CONTACTED', 'INTERESTED', 'CONVERTED', 'LOST'] as const;
@@ -34,12 +36,10 @@ function isOverdue(lead: Lead): boolean {
   return lead.follow_up_date <= new Date().toISOString().slice(0, 10);
 }
 
-interface LeadModalProps {
-  lead: Lead | null;
-  onClose: () => void;
-}
+// ─── Lead Modal ───────────────────────────────────────────────────────────────
 
-function LeadModal({ lead, onClose }: LeadModalProps) {
+function LeadModal({ lead, isAr, onClose }: { lead: Lead | null; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
   const [form, setForm] = useState(
     lead
       ? {
@@ -80,121 +80,82 @@ function LeadModal({ lead, onClose }: LeadModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            {lead ? 'Edit Lead' : 'Add New Lead'}
-          </h2>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <X className="h-4 w-4 text-slate-500" />
-          </button>
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 520 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {lead ? t.editLead : t.addLead}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Name *</label>
-              <input
-                required
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
+              <label className="ds-label">{t.name} *</label>
+              <input required className="ds-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Phone</label>
-              <input
-                value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="01xxxxxxxxx"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
+              <label className="ds-label">{t.phone}</label>
+              <input className="ds-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="01xxxxxxxxx" />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Service Interest</label>
-              <input
-                value={form.service_interest}
-                onChange={e => setForm(f => ({ ...f, service_interest: e.target.value }))}
-                placeholder="e.g. Braces, Implant..."
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
+              <label className="ds-label">{t.interestedIn}</label>
+              <input className="ds-input" value={form.service_interest} onChange={e => setForm(f => ({ ...f, service_interest: e.target.value }))} placeholder={isAr ? 'مثال: تقويم، زراعة...' : 'e.g. Braces, Implant...'} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Source</label>
-              <select
-                value={form.source}
-                onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">— Select source —</option>
+              <label className="ds-label">{t.source}</label>
+              <select className="ds-input" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
+                <option value="">{isAr ? '— اختر المصدر —' : '— Select source —'}</option>
                 {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Campaign</label>
-              <input
-                value={form.campaign}
-                onChange={e => setForm(f => ({ ...f, campaign: e.target.value }))}
-                placeholder="e.g. Summer Promo, Meta Ads..."
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
+              <label className="ds-label">{isAr ? 'الحملة' : 'Campaign'}</label>
+              <input className="ds-input" value={form.campaign} onChange={e => setForm(f => ({ ...f, campaign: e.target.value }))} placeholder={isAr ? 'مثال: عرض الصيف...' : 'e.g. Summer Promo...'} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Status</label>
-              <select
-                value={form.status ?? 'NEW'}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value as Lead['status'] }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              >
+              <label className="ds-label">{t.status}</label>
+              <select className="ds-input" value={form.status ?? 'NEW'} onChange={e => setForm(f => ({ ...f, status: e.target.value as Lead['status'] }))}>
                 {['NEW', 'CONTACTED', 'INTERESTED', 'CONVERTED', 'LOST'].map(s => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Follow-up Date</label>
-              <input
-                type="date"
-                value={form.follow_up_date}
-                onChange={e => setForm(f => ({ ...f, follow_up_date: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
+              <label className="ds-label">{t.followUpDate}</label>
+              <input type="date" className="ds-input" value={form.follow_up_date} onChange={e => setForm(f => ({ ...f, follow_up_date: e.target.value }))} />
             </div>
           </div>
+
           <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Notes</label>
-            <textarea
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={2}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-            />
+            <label className="ds-label">{t.notes}</label>
+            <textarea className="ds-input" style={{ resize: 'none' }} rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
 
-          <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:opacity-90 disabled:opacity-60 transition-opacity"
-            >
-              {isPending ? 'Saving...' : lead ? 'Save Changes' : 'Add Lead'}
-            </button>
-            <button type="button" onClick={onClose}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-              Cancel
-            </button>
-          </div>
           {(create.isError || update.isError) && (
-            <p className="text-sm text-red-600">{((create.error || update.error) as Error)?.message}</p>
+            <p className="ds-error">{((create.error || update.error) as Error)?.message}</p>
           )}
+
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : lead ? t.save : t.addLead}
+            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
+          </div>
         </form>
       </div>
     </div>
   );
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export function LeadsPage() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const t = useT(isAr);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
@@ -213,19 +174,21 @@ export function LeadsPage() {
   const convertLead = useConvertLead();
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this lead?')) return;
+    if (!confirm(isAr ? 'حذف هذا العميل؟' : 'Delete this lead?')) return;
     await deleteLead.mutateAsync(id);
   };
 
   const handleConvert = async (lead: Lead) => {
-    if (!confirm(`Convert "${lead.name}" to a patient?`)) return;
+    if (!confirm(`${isAr ? 'تحويل' : 'Convert'} "${lead.name}" ${isAr ? 'إلى مريض؟' : 'to a patient?'}`)) return;
     await convertLead.mutateAsync(lead);
   };
 
   const handleWhatsApp = (lead: Lead) => {
     const phone = (lead.phone ?? '').replace(/^0/, '2');
     const text = encodeURIComponent(
-      `السلام عليكم ${lead.name}، معاك فريق ${clinicName}. كنا تواصلنا معاك قبل كده بخصوص ${lead.service_interest ?? 'خدماتنا'}. كنا عايزين نتابع معاك ونشوف لو عندك أي استفسار. يسعدنا نساعدك 😊`
+      isAr
+        ? `السلام عليكم ${lead.name}، معاك فريق ${clinicName}. كنا تواصلنا معاك قبل كده بخصوص ${lead.service_interest ?? 'خدماتنا'}. كنا عايزين نتابع معاك ونشوف لو عندك أي استفسار. يسعدنا نساعدك 😊`
+        : `Hello ${lead.name}, this is the ${clinicName} team. We reached out before regarding ${lead.service_interest ?? 'our services'}. We wanted to follow up and see if you have any questions. We'd love to help!`
     );
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
   };
@@ -244,71 +207,78 @@ export function LeadsPage() {
     })));
   };
 
-  const openAdd = () => {
-    setEditingLead(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = (lead: Lead) => {
-    setEditingLead(lead);
-    setModalOpen(true);
-  };
+  const openAdd = () => { setEditingLead(null); setModalOpen(true); };
+  const openEdit = (lead: Lead) => { setEditingLead(lead); setModalOpen(true); };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Leads / CRM</h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{leads.length} leads</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeIn 0.3s ease' }}>
+
+      {/* Toolbar */}
+      <div className="ds-card" style={{ padding: '18px 20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <span className="ds-badge ds-badge-p" style={{ fontSize: 12, padding: '4px 10px' }}>
+            {leads.length} {isAr ? 'عميل' : 'leads'}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={handleExport} className="ds-btn ds-btn-ghost" style={{ gap: 6 }}>
+            <Download size={14} /> {isAr ? 'تصدير CSV' : 'Export CSV'}
+          </button>
+          <button onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {t.addLead}
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:opacity-90 transition-opacity"
-          >
-            <Plus className="h-4 w-4" /> Add Lead
-          </button>
+
+        <div style={{ marginTop: 14, position: 'relative' }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--txt3)', pointerEvents: 'none' }} />
+          <input
+            placeholder={isAr ? 'بحث بالاسم أو الهاتف...' : 'Search by name or phone...'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="ds-search"
+            style={{ paddingLeft: 36 }}
+          />
         </div>
       </div>
 
-      {/* Overdue Follow-ups Panel */}
+      {/* Overdue Panel */}
       {overdueLeads.length > 0 && (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Overdue Follow-ups ({overdueLeads.length})
+        <div style={{ borderRadius: 14, border: '1px solid var(--warn)', background: 'var(--warn-soft)', padding: '14px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <AlertCircle size={15} style={{ color: 'var(--warn)', flexShrink: 0 }} />
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--warn)', margin: 0 }}>
+              {t.overdueFollowups} ({overdueLeads.length})
             </h3>
           </div>
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {overdueLeads.map(lead => (
-              <div key={lead.id} className="flex items-center justify-between rounded-lg bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-800/40 px-3 py-2">
+              <div key={lead.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--brd)',
+                padding: '10px 14px',
+              }}>
                 <div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{lead.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{lead.name}</span>
                   {lead.service_interest && (
-                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">• {lead.service_interest}</span>
+                    <span style={{ fontSize: 12, color: 'var(--txt3)', marginLeft: 8 }}>• {lead.service_interest}</span>
                   )}
-                  <div className="text-xs text-red-500 dark:text-red-400 mt-0.5">
-                    Due: {lead.follow_up_date}
+                  <div style={{ fontSize: 11, color: 'var(--err)', marginTop: 2 }}>
+                    {isAr ? 'مستحق:' : 'Due:'} {lead.follow_up_date}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[lead.status] ?? ''}`}>
-                    {lead.status}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className={STATUS_CLS[lead.status] ?? 'ds-badge ds-badge-neutral'}>
+                    {getStatusLabel(lead.status, isAr)}
                   </span>
                   {lead.phone && (
                     <button
                       onClick={() => handleWhatsApp(lead)}
-                      className="flex items-center gap-1 rounded-lg bg-green-500 hover:bg-green-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        background: '#25D366', color: '#fff', border: 'none',
+                        borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      }}
                     >
-                      <Phone className="h-3 w-3" /> WhatsApp
+                      <Phone size={11} /> WhatsApp
                     </button>
                   )}
                 </div>
@@ -319,114 +289,88 @@ export function LeadsPage() {
       )}
 
       {/* Status Tabs */}
-      <div className="flex gap-1 overflow-x-auto">
+      <div className="ds-tabs">
         {STATUS_TABS.map(tab => (
           <button
             key={tab}
             onClick={() => setStatusFilter(tab)}
-            className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              statusFilter === tab
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+            className={`ds-tab${statusFilter === tab ? ' active' : ''}`}
           >
-            {tab}
+            {tab === 'ALL' ? t.allLeads : getStatusLabel(tab, isAr)}
           </button>
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <input
-          placeholder="Search by name or phone..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-9 pr-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-brand-500"
-        />
-      </div>
-
       {/* Table */}
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
+        <div className="ds-card" style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+          <div className="ds-spinner" />
         </div>
       ) : error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        <div className="ds-card" style={{ padding: 18, background: 'var(--err-soft)', border: '1px solid var(--err)', color: 'var(--err)' }}>
           {(error as Error).message}
         </div>
       ) : leads.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-12 text-center">
-          <Megaphone className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-sm text-slate-400">{search ? 'No leads found.' : 'No leads yet.'}</p>
+        <div className="ds-empty">
+          <Megaphone size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{search ? t.noLeadsFound : t.noLeadsFound}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="ds-table">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Phone</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Service</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Source</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Campaign</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Status</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Follow-up</th>
-                <th className="px-4 py-3 text-right font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide">Actions</th>
+              <tr>
+                <th className="ds-th">{t.name}</th>
+                <th className="ds-th">{t.phone}</th>
+                <th className="ds-th">{t.service}</th>
+                <th className="ds-th">{t.source}</th>
+                <th className="ds-th">{isAr ? 'الحملة' : 'Campaign'}</th>
+                <th className="ds-th">{t.status}</th>
+                <th className="ds-th">{t.followUpDate}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {leads.map(lead => (
-                <tr key={lead.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{lead.name}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{lead.phone || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">{lead.service_interest || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">{lead.source || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">{lead.campaign || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[lead.status] ?? ''}`}>
-                      {lead.status}
+                <tr key={lead.id} className="ds-tbody-row">
+                  <td className="ds-td" style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{lead.name}</td>
+                  <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{lead.phone || '—'}</td>
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.service_interest || '—'}</td>
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.source || '—'}</td>
+                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.campaign || '—'}</td>
+                  <td className="ds-td">
+                    <span className={STATUS_CLS[lead.status] ?? 'ds-badge ds-badge-neutral'}>
+                      {getStatusLabel(lead.status, isAr)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs">
+                  <td className="ds-td" style={{ fontSize: 12 }}>
                     {lead.follow_up_date ? (
-                      <span className={isOverdue(lead) ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-slate-400 dark:text-slate-500'}>
-                        {lead.follow_up_date}
-                        {isOverdue(lead) && ' ⚠'}
+                      <span style={{ fontWeight: isOverdue(lead) ? 700 : 400, color: isOverdue(lead) ? 'var(--err)' : 'var(--txt3)' }}>
+                        {lead.follow_up_date}{isOverdue(lead) ? ' !' : ''}
                       </span>
                     ) : '—'}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="ds-td">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                       {lead.phone && (
                         <button
                           onClick={() => handleWhatsApp(lead)}
-                          title="Send WhatsApp"
-                          className="rounded p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
+                          title="WhatsApp"
+                          style={{ background: 'rgba(37,211,102,0.12)', color: '#25D366', border: 'none', borderRadius: 7, padding: '5px 7px', cursor: 'pointer', display: 'flex' }}
                         >
-                          <Phone className="h-3.5 w-3.5" />
+                          <Phone size={13} />
                         </button>
                       )}
                       {(lead.status === 'INTERESTED' || lead.status === 'CONTACTED') && (
-                        <button
-                          onClick={() => handleConvert(lead)}
-                          title="Convert to Patient"
-                          className="rounded p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
-                        >
-                          <UserCheck className="h-3.5 w-3.5" />
+                        <button onClick={() => handleConvert(lead)} className="ds-icon-btn" title={t.convertToPatient}>
+                          <UserCheck size={13} />
                         </button>
                       )}
-                      <button
-                        onClick={() => openEdit(lead)}
-                        className="rounded p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
+                      <button onClick={() => openEdit(lead)} className="ds-icon-btn">
+                        <Edit2 size={13} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(lead.id)}
-                        className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
+                      <button onClick={() => handleDelete(lead.id)} className="ds-icon-btn-err">
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </td>
@@ -437,10 +381,10 @@ export function LeadsPage() {
         </div>
       )}
 
-      {/* Modal */}
       {modalOpen && (
         <LeadModal
           lead={editingLead}
+          isAr={isAr}
           onClose={() => { setModalOpen(false); setEditingLead(null); }}
         />
       )}
