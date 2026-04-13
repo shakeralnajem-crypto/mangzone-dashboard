@@ -55,6 +55,18 @@ export function useCreateExpense() {
   });
 }
 
+export function useUpdateExpense() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...values }: Partial<ExpenseInsert> & { id: string }) => {
+      const { error } = await db.from('expenses').update(values).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+  });
+}
+
 export function useDeleteExpense() {
   const qc = useQueryClient();
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { PhoneCall, Clock, AlertTriangle, CheckCircle2, Download, RefreshCw, MessageCircle } from 'lucide-react';
+import { PhoneCall, Clock, AlertTriangle, CheckCircle2, Download, RefreshCw, MessageCircle, Edit2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useFollowups, useFollowupStats, useAutoGenerateFollowups, useUpdateFollowupStatus } from '@/hooks/useFollowups';
+import { useFollowups, useFollowupStats, useAutoGenerateFollowups, useUpdateFollowupStatus, useUpdateFollowup } from '@/hooks/useFollowups';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
@@ -26,12 +26,102 @@ function openWhatsApp(phone: string | null) {
   window.open(`https://wa.me/${intl}`, '_blank', 'noopener,noreferrer');
 }
 
+// ─── Edit Follow-up Modal ─────────────────────────────────────────────────────
+
+function EditFollowupModal({ followup, isAr, onClose }: { followup: FollowupLead; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
+  const update = useUpdateFollowup();
+  const [form, setForm] = useState({
+    name: followup.name,
+    phone: followup.phone ?? '',
+    service_interest: followup.service_interest ?? '',
+    follow_up_date: followup.follow_up_date ?? '',
+    notes: followup.notes ?? '',
+    status: followup.status,
+  });
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await update.mutateAsync({
+        id: followup.id,
+        name: form.name,
+        phone: form.phone || null,
+        service_interest: form.service_interest || null,
+        follow_up_date: form.follow_up_date || null,
+        notes: form.notes || null,
+        status: form.status as FollowupLead['status'],
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (isAr ? 'فشل الحفظ.' : 'Save failed.'));
+    }
+  };
+
+  return (
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 480 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {isAr ? 'تعديل المتابعة' : 'Edit Follow-up'}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="ds-label">{t.name} *</label>
+              <input required className="ds-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="ds-label">{t.phone}</label>
+              <input type="tel" className="ds-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="01xxxxxxxxx" />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="ds-label">{isAr ? 'اهتمام الخدمة' : 'Service Interest'}</label>
+              <input className="ds-input" value={form.service_interest} onChange={e => setForm(f => ({ ...f, service_interest: e.target.value }))} />
+            </div>
+            <div>
+              <label className="ds-label">{t.followUpDate}</label>
+              <input type="date" className="ds-input" value={form.follow_up_date} onChange={e => setForm(f => ({ ...f, follow_up_date: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="ds-label">{t.status}</label>
+            <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as typeof form.status }))}>
+              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="ds-label">{t.notes}</label>
+            <textarea className="ds-input" rows={2} style={{ resize: 'none' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          {error && <p className="ds-error">{error}</p>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={update.isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {update.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.save}
+            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export function FollowupPage() {
   const { i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const t = useT(isAr);
 
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
+  const [editingFollowup, setEditingFollowup] = useState<FollowupLead | null>(null);
 
   const { data: followups = [], isLoading } = useFollowups();
   const { data: stats } = useFollowupStats();
@@ -214,7 +304,14 @@ export function FollowupPage() {
                     </select>
                   </td>
                   <td className="ds-td">
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                      <button
+                        onClick={() => setEditingFollowup(f)}
+                        className="ds-icon-btn"
+                        title={t.edit}
+                      >
+                        <Edit2 size={13} />
+                      </button>
                       <button
                         onClick={() => openWhatsApp(f.phone)}
                         disabled={!f.phone}
@@ -236,6 +333,14 @@ export function FollowupPage() {
           </table>
         )}
       </div>
+
+      {editingFollowup && (
+        <EditFollowupModal
+          followup={editingFollowup}
+          isAr={isAr}
+          onClose={() => setEditingFollowup(null)}
+        />
+      )}
     </div>
   );
 }

@@ -77,6 +77,22 @@ export function useBillingStats() {
   });
 }
 
+export function useUpdateInvoice() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...values }: Partial<InvoiceInsert> & { id: string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('invoices')
+        .update(values)
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
+  });
+}
+
 export function useCreateInvoice() {
   const qc = useQueryClient();
   const { profile } = useAuthStore();

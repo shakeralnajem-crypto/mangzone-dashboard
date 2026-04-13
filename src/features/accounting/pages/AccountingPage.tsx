@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Trash2, Download, X, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react';
+import { Plus, Trash2, Edit2, Download, X, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react';
 import {
   useExpenses,
   useCreateExpense,
+  useUpdateExpense,
   useDeleteExpense,
   useDoctorDues,
   useMonthlyReport,
@@ -11,6 +12,9 @@ import { useTranslation } from 'react-i18next';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
 import { exportToCsv } from '@/lib/exportCsv';
+import type { Database } from '@/types/supabase';
+
+type Expense = Database['public']['Tables']['expenses']['Row'];
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type Tab = 'expenses' | 'doctor-dues' | 'monthly-report';
@@ -34,6 +38,112 @@ function fmt(n: number) {
   return new Intl.NumberFormat('en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(n);
 }
 
+// ─── Expense Edit Modal ───────────────────────────────────────────────────────
+
+function ExpenseEditModal({ expense, isAr, onClose }: { expense: Expense; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
+  const update = useUpdateExpense();
+  const { pushAction } = useHistoryStore();
+
+  const [form, setForm] = useState({
+    category: expense.category,
+    description: expense.description ?? '',
+    amount: String(expense.amount),
+    expense_date: expense.expense_date,
+    paid_to: expense.paid_to ?? '',
+    notes: expense.notes ?? '',
+  });
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const amount = parseFloat(form.amount);
+    if (isNaN(amount) || amount < 0) {
+      setError(isAr ? 'يجب أن يكون المبلغ رقماً صحيحاً.' : 'Amount must be a valid number.');
+      return;
+    }
+    const oldValues = {
+      category: expense.category,
+      description: expense.description,
+      amount: expense.amount,
+      expense_date: expense.expense_date,
+      paid_to: expense.paid_to,
+      notes: expense.notes,
+    };
+    const newValues = {
+      category: form.category,
+      description: form.description || null,
+      amount,
+      expense_date: form.expense_date,
+      paid_to: form.paid_to || null,
+      notes: form.notes || null,
+    };
+    await update.mutateAsync({ id: expense.id, ...newValues });
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Edited expense: ${form.category}`,
+      description_ar: `تعديل مصروف: ${form.category}`,
+      undo: async () => { await update.mutateAsync({ id: expense.id, ...oldValues }); },
+      redo: async () => { await update.mutateAsync({ id: expense.id, ...newValues }); },
+    });
+    onClose();
+  };
+
+  return (
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 520 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {isAr ? 'تعديل المصروف' : 'Edit Expense'}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="ds-label">{t.category} *</label>
+              <select required className="ds-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {EXPENSE_CATEGORIES_EN.map((c, i) => (
+                  <option key={c} value={c}>{isAr ? EXPENSE_CATEGORIES_AR[i] : c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="ds-label">{t.amount} (EGP) *</label>
+              <input required type="number" min="0" step="0.01" className="ds-input" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
+            </div>
+            <div>
+              <label className="ds-label">{t.date} *</label>
+              <input required type="date" className="ds-input" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))} />
+            </div>
+            <div>
+              <label className="ds-label">{isAr ? 'مدفوع لـ' : 'Paid To'}</label>
+              <input className="ds-input" value={form.paid_to} onChange={e => setForm(f => ({ ...f, paid_to: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="ds-label">{t.description}</label>
+            <input className="ds-input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div>
+            <label className="ds-label">{isAr ? 'ملاحظات' : 'Notes'}</label>
+            <textarea className="ds-input" rows={2} style={{ resize: 'none' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          {error && <p className="ds-error">{error}</p>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={update.isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {update.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.save}
+            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Expenses Tab ────────────────────────────────────────────────────────────
 
 function ExpensesTab({ isAr }: { isAr: boolean }) {
@@ -43,6 +153,7 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyExpenseForm });
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
   const { data: expenses = [], isLoading } = useExpenses(year, month);
   const create = useCreateExpense();
@@ -181,31 +292,37 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
                     <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.expense_date}</td>
                     <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.paid_to || '—'}</td>
                     <td className="ds-td" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--txt)' }}>{fmt(exp.amount)}</td>
-                    <td className="ds-td" style={{ textAlign: 'right' }}>
-                      <button onClick={async () => {
-                        await remove.mutateAsync(exp.id);
-                        let restoredId = exp.id;
-                        pushAction({
-                          id: crypto.randomUUID(),
-                          timestamp: Date.now(),
-                          description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
-                          description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
-                          undo: async () => {
-                            const created = await create.mutateAsync({
-                              category: exp.category,
-                              description: exp.description,
-                              amount: exp.amount,
-                              expense_date: exp.expense_date,
-                              paid_to: exp.paid_to,
-                              notes: exp.notes,
-                            });
-                            restoredId = created.id;
-                          },
-                          redo: async () => { await remove.mutateAsync(restoredId); },
-                        });
-                      }} className="ds-icon-btn-err">
-                        <Trash2 size={13} />
-                      </button>
+                    <td className="ds-td">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                        <button onClick={() => setEditingExpense(exp)} className="ds-icon-btn" title={t.edit}>
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={async () => {
+                          if (!confirm(isAr ? `حذف هذا المصروف؟` : `Delete this expense?`)) return;
+                          await remove.mutateAsync(exp.id);
+                          let restoredId = exp.id;
+                          pushAction({
+                            id: crypto.randomUUID(),
+                            timestamp: Date.now(),
+                            description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
+                            description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
+                            undo: async () => {
+                              const created = await create.mutateAsync({
+                                category: exp.category,
+                                description: exp.description,
+                                amount: exp.amount,
+                                expense_date: exp.expense_date,
+                                paid_to: exp.paid_to,
+                                notes: exp.notes,
+                              });
+                              restoredId = created.id;
+                            },
+                            redo: async () => { await remove.mutateAsync(restoredId); },
+                          });
+                        }} className="ds-icon-btn-err" title={t.delete}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -213,6 +330,14 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {editingExpense && (
+        <ExpenseEditModal
+          expense={editingExpense}
+          isAr={isAr}
+          onClose={() => setEditingExpense(null)}
+        />
       )}
     </div>
   );

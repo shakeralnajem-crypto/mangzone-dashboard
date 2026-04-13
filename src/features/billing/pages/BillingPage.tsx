@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ReceiptText, Download, Plus, X, TrendingUp, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { ReceiptText, Download, Plus, X, TrendingUp, Clock, AlertTriangle, FileText, Edit2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useInvoices, useBillingStats, useCreateInvoice } from '@/hooks/useInvoices';
+import { useInvoices, useBillingStats, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices';
 import { usePatients } from '@/hooks/usePatients';
 import { formatEGP } from '@/lib/currency';
 import { exportToCsv } from '@/lib/exportCsv';
@@ -9,6 +9,12 @@ import { useT, getStatusLabel } from '@/lib/translations';
 import type { Database } from '@/types/supabase';
 
 type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
+type Invoice = Database['public']['Tables']['invoices']['Row'];
+type InvoiceWithRelations = Invoice & {
+  patient: { first_name: string; last_name: string; phone: string | null } | null;
+  doctor: { full_name: string } | null;
+  payments: { amount: number; payment_method: string; payment_date: string }[];
+};
 
 const INV_STATUS_CLS: Record<string, string> = {
   PAID:           'ds-badge ds-badge-ok',
@@ -18,13 +24,83 @@ const INV_STATUS_CLS: Record<string, string> = {
   CANCELLED:      'ds-badge ds-badge-err',
 };
 
+const INV_STATUSES = ['DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'] as const;
+
+// ─── Shared Invoice Form Fields ───────────────────────────────────────────────
+
+function InvoiceForm({
+  form, setForm, isAr, t,
+  autoTotal, onSubtotalChange, onDiscountChange, onTotalChange,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  form: any; setForm: (fn: (f: any) => any) => void;
+  isAr: boolean; t: ReturnType<typeof useT>;
+  autoTotal: number;
+  onSubtotalChange: (v: string) => void;
+  onDiscountChange: (v: string) => void;
+  onTotalChange: (v: string) => void;
+}) {
+  const { data: patients = [] } = usePatients('');
+  return (
+    <>
+      <div>
+        <label className="ds-label">{t.patient}</label>
+        <select className="ds-input" value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}>
+          <option value="">{isAr ? '— بدون مريض —' : '— No patient —'}</option>
+          {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <label className="ds-label">{t.invoiceNumber}</label>
+          <input className="ds-input" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
+        </div>
+        <div>
+          <label className="ds-label">{t.status}</label>
+          <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+            {INV_STATUSES.map(s => <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div>
+          <label className="ds-label">{t.subtotal} (EGP)</label>
+          <input type="number" min="0" step="0.01" className="ds-input" value={form.subtotal} onChange={e => onSubtotalChange(e.target.value)} placeholder="0" />
+        </div>
+        <div>
+          <label className="ds-label">{t.discount} (EGP)</label>
+          <input type="number" min="0" step="0.01" className="ds-input" value={form.discount} onChange={e => onDiscountChange(e.target.value)} />
+        </div>
+        <div>
+          <label className="ds-label">
+            {t.grandTotal} *{autoTotal > 0 && <span style={{ color: 'var(--p3)', fontWeight: 400, marginLeft: 4 }}>({autoTotal})</span>}
+          </label>
+          <input required type="number" min="0.01" step="0.01" className="ds-input" value={form.total_amount} onChange={e => onTotalChange(e.target.value)} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <label className="ds-label">{isAr ? 'الرصيد المستحق (ج.م)' : 'Balance Due (EGP)'}</label>
+          <input type="number" min="0" step="0.01" className="ds-input" value={form.balance_due} onChange={e => setForm(f => ({ ...f, balance_due: e.target.value }))} />
+        </div>
+        <div>
+          <label className="ds-label">{t.dueDate}</label>
+          <input type="date" className="ds-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
+        </div>
+      </div>
+      <div>
+        <label className="ds-label">{t.notes}</label>
+        <textarea className="ds-input" style={{ resize: 'none' }} rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+      </div>
+    </>
+  );
+}
+
 // ─── Add Invoice Modal ────────────────────────────────────────────────────────
 
 function AddInvoiceModal({ invoiceCount, isAr, onClose }: { invoiceCount: number; isAr: boolean; onClose: () => void }) {
   const t = useT(isAr);
-  const { data: patients = [] } = usePatients('');
   const create = useCreateInvoice();
-
   const nextNumber = `INV-${String(invoiceCount + 1).padStart(3, '0')}`;
 
   const [form, setForm] = useState({
@@ -34,7 +110,7 @@ function AddInvoiceModal({ invoiceCount, isAr, onClose }: { invoiceCount: number
     discount: '0',
     total_amount: '',
     balance_due: '',
-    status: 'UNPAID' as NonNullable<InvoiceInsert['status']>,
+    status: 'UNPAID',
     due_date: '',
     notes: '',
   });
@@ -44,21 +120,19 @@ function AddInvoiceModal({ invoiceCount, isAr, onClose }: { invoiceCount: number
   const discountNum = parseFloat(form.discount) || 0;
   const autoTotal = subtotalNum - discountNum;
 
-  const handleSubtotalChange = (v: string) => {
+  const onSubtotalChange = (v: string) => {
     const sub = parseFloat(v) || 0;
     const disc = parseFloat(form.discount) || 0;
     const total = sub - disc;
     setForm(f => ({ ...f, subtotal: v, total_amount: total > 0 ? String(total) : '0', balance_due: total > 0 ? String(total) : '0' }));
   };
-  const handleDiscountChange = (v: string) => {
+  const onDiscountChange = (v: string) => {
     const sub = parseFloat(form.subtotal) || 0;
     const disc = parseFloat(v) || 0;
     const total = sub - disc;
     setForm(f => ({ ...f, discount: v, total_amount: total > 0 ? String(total) : '0', balance_due: total > 0 ? String(total) : '0' }));
   };
-  const handleTotalChange = (v: string) => {
-    setForm(f => ({ ...f, total_amount: v, balance_due: v }));
-  };
+  const onTotalChange = (v: string) => setForm(f => ({ ...f, total_amount: v, balance_due: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +151,7 @@ function AddInvoiceModal({ invoiceCount, isAr, onClose }: { invoiceCount: number
         discount: discountNum || null,
         total_amount: total,
         balance_due: isNaN(balance) ? total : balance,
-        status: form.status,
+        status: form.status as InvoiceInsert['status'],
         due_date: form.due_date || null,
         notes: form.notes || null,
       });
@@ -94,69 +168,103 @@ function AddInvoiceModal({ invoiceCount, isAr, onClose }: { invoiceCount: number
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>{t.addInvoice}</span>
           <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-
         <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label className="ds-label">{t.patient}</label>
-            <select className="ds-input" value={form.patient_id} onChange={e => setForm(f => ({ ...f, patient_id: e.target.value }))}>
-              <option value="">{isAr ? '— بدون مريض —' : '— No patient —'}</option>
-              {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
-            </select>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="ds-label">{t.invoiceNumber}</label>
-              <input className="ds-input" value={form.invoice_number} onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))} />
-            </div>
-            <div>
-              <label className="ds-label">{t.status}</label>
-              <select className="ds-input" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as typeof form.status }))}>
-                {(['DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'] as const).map(s => (
-                  <option key={s} value={s}>{getStatusLabel(s, isAr)}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="ds-label">{t.subtotal} (EGP)</label>
-              <input type="number" min="0" step="0.01" className="ds-input" value={form.subtotal} onChange={e => handleSubtotalChange(e.target.value)} placeholder="0" />
-            </div>
-            <div>
-              <label className="ds-label">{t.discount} (EGP)</label>
-              <input type="number" min="0" step="0.01" className="ds-input" value={form.discount} onChange={e => handleDiscountChange(e.target.value)} />
-            </div>
-            <div>
-              <label className="ds-label">
-                {t.grandTotal} *{autoTotal > 0 && <span style={{ color: 'var(--p3)', fontWeight: 400, marginLeft: 4 }}>({autoTotal})</span>}
-              </label>
-              <input required type="number" min="0.01" step="0.01" className="ds-input" value={form.total_amount} onChange={e => handleTotalChange(e.target.value)} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="ds-label">{isAr ? 'الرصيد المستحق (ج.م)' : 'Balance Due (EGP)'}</label>
-              <input type="number" min="0" step="0.01" className="ds-input" value={form.balance_due} onChange={e => setForm(f => ({ ...f, balance_due: e.target.value }))} />
-            </div>
-            <div>
-              <label className="ds-label">{t.dueDate}</label>
-              <input type="date" className="ds-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
-            </div>
-          </div>
-
-          <div>
-            <label className="ds-label">{t.notes}</label>
-            <textarea className="ds-input" style={{ resize: 'none' }} rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-          </div>
-
+          <InvoiceForm form={form} setForm={setForm} isAr={isAr} t={t} autoTotal={autoTotal}
+            onSubtotalChange={onSubtotalChange} onDiscountChange={onDiscountChange} onTotalChange={onTotalChange} />
           {submitError && <p className="ds-error">{submitError}</p>}
-
           <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
             <button type="submit" disabled={create.isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
               {create.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.addInvoice}
+            </button>
+            <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Invoice Modal ───────────────────────────────────────────────────────
+
+function EditInvoiceModal({ invoice, isAr, onClose }: { invoice: InvoiceWithRelations; isAr: boolean; onClose: () => void }) {
+  const t = useT(isAr);
+  const update = useUpdateInvoice();
+
+  const [form, setForm] = useState({
+    patient_id: invoice.patient_id ?? '',
+    invoice_number: invoice.invoice_number ?? '',
+    subtotal: invoice.subtotal != null ? String(invoice.subtotal) : '',
+    discount: invoice.discount != null ? String(invoice.discount) : '0',
+    total_amount: String(invoice.total_amount),
+    balance_due: String(invoice.balance_due),
+    status: invoice.status ?? 'UNPAID',
+    due_date: invoice.due_date ?? '',
+    notes: invoice.notes ?? '',
+  });
+  const [submitError, setSubmitError] = useState('');
+
+  const subtotalNum = parseFloat(form.subtotal) || 0;
+  const discountNum = parseFloat(form.discount) || 0;
+  const autoTotal = subtotalNum - discountNum;
+
+  const onSubtotalChange = (v: string) => {
+    const sub = parseFloat(v) || 0;
+    const disc = parseFloat(form.discount) || 0;
+    const total = sub - disc;
+    setForm(f => ({ ...f, subtotal: v, total_amount: total > 0 ? String(total) : '0', balance_due: total > 0 ? String(total) : '0' }));
+  };
+  const onDiscountChange = (v: string) => {
+    const sub = parseFloat(form.subtotal) || 0;
+    const disc = parseFloat(v) || 0;
+    const total = sub - disc;
+    setForm(f => ({ ...f, discount: v, total_amount: total > 0 ? String(total) : '0', balance_due: total > 0 ? String(total) : '0' }));
+  };
+  const onTotalChange = (v: string) => setForm(f => ({ ...f, total_amount: v, balance_due: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError('');
+    const total = parseFloat(form.total_amount);
+    const balance = parseFloat(form.balance_due);
+    if (isNaN(total) || total <= 0) {
+      setSubmitError(isAr ? 'يجب أن يكون الإجمالي أكبر من 0.' : 'Total amount must be greater than 0.');
+      return;
+    }
+    try {
+      await update.mutateAsync({
+        id: invoice.id,
+        patient_id: form.patient_id || null,
+        invoice_number: form.invoice_number,
+        subtotal: subtotalNum || null,
+        discount: discountNum || null,
+        total_amount: total,
+        balance_due: isNaN(balance) ? total : balance,
+        status: form.status as InvoiceInsert['status'],
+        due_date: form.due_date || null,
+        notes: form.notes || null,
+      });
+      onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : (isAr ? 'فشل تحديث الفاتورة.' : 'Failed to update invoice.'));
+    }
+  };
+
+  return (
+    <div className="ds-overlay">
+      <div className="ds-modal" style={{ maxWidth: 520 }}>
+        <div className="ds-modal-hd">
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>
+            {isAr ? 'تعديل الفاتورة' : 'Edit Invoice'} — {invoice.invoice_number}
+          </span>
+          <button className="ds-modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <InvoiceForm form={form} setForm={setForm} isAr={isAr} t={t} autoTotal={autoTotal}
+            onSubtotalChange={onSubtotalChange} onDiscountChange={onDiscountChange} onTotalChange={onTotalChange} />
+          {submitError && <p className="ds-error">{submitError}</p>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button type="submit" disabled={update.isPending} className="ds-btn ds-btn-primary" style={{ flex: 1 }}>
+              {update.isPending ? (isAr ? 'جاري الحفظ...' : 'Saving...') : t.save}
             </button>
             <button type="button" onClick={onClose} className="ds-btn ds-btn-ghost">{t.cancel}</button>
           </div>
@@ -174,6 +282,7 @@ export function BillingPage() {
   const t = useT(isAr);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceWithRelations | null>(null);
   const { data: invoices = [], isLoading, error } = useInvoices();
   const { data: stats } = useBillingStats();
   const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل الفواتير.' : 'Failed to load invoices.');
@@ -257,6 +366,7 @@ export function BillingPage() {
                 <th className="ds-th" style={{ textAlign: 'right' }}>{t.total}</th>
                 <th className="ds-th">{t.status}</th>
                 <th className="ds-th">{t.dueDate}</th>
+                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -296,6 +406,17 @@ export function BillingPage() {
                   <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>
                     {inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-EG', { dateStyle: 'medium' }) : '—'}
                   </td>
+                  <td className="ds-td">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                      <button
+                        onClick={() => setEditingInvoice(inv)}
+                        className="ds-icon-btn"
+                        title={t.edit}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -304,6 +425,7 @@ export function BillingPage() {
       )}
 
       {addOpen && <AddInvoiceModal invoiceCount={invoices.length} isAr={isAr} onClose={() => setAddOpen(false)} />}
+      {editingInvoice && <EditInvoiceModal invoice={editingInvoice} isAr={isAr} onClose={() => setEditingInvoice(null)} />}
     </div>
   );
 }

@@ -131,6 +131,21 @@ export function useAutoGenerateFollowups() {
   });
 }
 
+export function useUpdateFollowup() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...values }: Partial<Lead> & { id: string }) => {
+      const { error } = await db.from('leads').update(values).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['followups'] });
+      qc.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+}
+
 export function useUpdateFollowupStatus() {
   const qc = useQueryClient();
 
