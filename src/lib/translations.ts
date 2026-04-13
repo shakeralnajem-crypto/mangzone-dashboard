@@ -542,7 +542,6 @@ export const STATUS_LABELS: Record<string, { en: string; ar: string }> = {
   LOST:       { en: 'Lost',       ar: 'مفقود' },
   // Treatments
   PLANNED:     { en: 'Planned',     ar: 'مخطط' },
-  IN_PROGRESS: { en: 'In Progress', ar: 'جارٍ' },
   ACTIVE:      { en: 'Active',      ar: 'نشط' },
   ON_HOLD:     { en: 'On Hold',     ar: 'معلق' },
   // Content
