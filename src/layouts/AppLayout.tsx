@@ -17,6 +17,7 @@ import { authApi } from '@/features/auth/api/auth.api';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -33,7 +34,7 @@ const navItems: NavItem[] = [
   { label_en: 'Patients',       label_ar: 'المرضى',            icon: Users,           to: '/patients',     roles: ['ADMIN','DOCTOR','RECEPTIONIST'] },
   { label_en: 'Leads',          label_ar: 'العملاء المحتملون', icon: Megaphone,       to: '/leads',        roles: ['ADMIN','RECEPTIONIST'] },
   { label_en: 'Treatments',     label_ar: 'خطط العلاج',        icon: ClipboardList,   to: '/treatments',   roles: ['ADMIN','DOCTOR'] },
-  { label_en: 'Billing',        label_ar: 'الفواتير',          icon: ReceiptText,     to: '/billing',      roles: ['ADMIN','ACCOUNTANT','RECEPTIONIST'] },
+  { label_en: 'Billing',        label_ar: 'الفواتير',          icon: ReceiptText,     to: '/billing',      roles: ['ADMIN','ACCOUNTANT'] },
   { label_en: 'Follow-up',      label_ar: 'المتابعة',          icon: PhoneCall,       to: '/followup',     roles: ['ADMIN','RECEPTIONIST'] },
   { label_en: 'Reports',        label_ar: 'التقارير',          icon: BarChart3,       to: '/reports',      roles: ['ADMIN','ACCOUNTANT'] },
   { label_en: 'Accounting',     label_ar: 'المحاسبة',          icon: Calculator,      to: '/accounting',   roles: ['ADMIN','ACCOUNTANT'] },
@@ -140,10 +141,14 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-48">
-            <DropdownMenuItem onClick={() => navigate('/settings')}>
-              <Settings className="h-4 w-4 mr-2" /> {t.settings}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {profile?.role === 'ADMIN' && (
+              <>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                  <Settings className="h-4 w-4 mr-2" /> {t.settings}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
               <LogOut className="h-4 w-4 mr-2" /> {isAr ? 'تسجيل الخروج' : 'Log out'}
             </DropdownMenuItem>
@@ -165,6 +170,7 @@ export function AppLayout() {
   const meta = pageMeta[location.pathname] ?? { en: 'MANGZONE', ar: 'MANGZONE', sub_en: '', sub_ar: '' };
   const t = useT(isAr);
   const { past, future, undo, redo, isProcessing } = useHistoryStore();
+  const { canAction } = usePermissions();
   const canUndo = past.length > 0 && !isProcessing;
   const canRedo = future.length > 0 && !isProcessing;
 
@@ -301,11 +307,13 @@ export function AppLayout() {
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
-            {/* Primary action */}
-            <button className="ds-btn ds-btn-primary" onClick={() => navigate('/appointments')}>
-              <Plus size={15} strokeWidth={2.5} />
-              {t.newAppointment}
-            </button>
+            {/* Primary action — hidden for roles without appointments access */}
+            {canAction('create:appointment') && (
+              <button className="ds-btn ds-btn-primary" onClick={() => navigate('/appointments')}>
+                <Plus size={15} strokeWidth={2.5} />
+                {t.newAppointment}
+              </button>
+            )}
           </div>
         </header>
 

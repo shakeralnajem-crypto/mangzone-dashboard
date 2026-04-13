@@ -9,6 +9,7 @@ import {
 import { formatEGP } from '@/lib/currency';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { Database } from '@/types/supabase';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -218,6 +219,7 @@ function DoctorCard({ doctor, apptCount, billedAmount, isAr, onEdit, onDelete, c
   onEdit: (d: Doctor) => void; onDelete: (d: Doctor) => void; colorIdx: number;
 }) {
   const t = useT(isAr);
+  const { can } = usePermissions();
   const initials = doctor.full_name.split(' ').slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase();
 
   return (
@@ -234,7 +236,9 @@ function DoctorCard({ doctor, apptCount, billedAmount, isAr, onEdit, onDelete, c
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
               <button onClick={() => onEdit(doctor)} className="ds-icon-btn"><Edit2 size={13} /></button>
-              <button onClick={() => onDelete(doctor)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+              {can('delete:staff') && (
+                <button onClick={() => onDelete(doctor)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+              )}
             </div>
           </div>
           {doctor.phone && <p style={{ fontSize: 12, color: 'var(--txt2)', marginTop: 4 }}>{doctor.phone}</p>}
@@ -281,6 +285,7 @@ export function StaffPage() {
   const createDoctor = useCreateDoctor();
   const createMember = useCreateClinicStaff();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const nonDoctors = staff.filter(s => s.role !== 'DOCTOR');
   const activeDoctors = doctors.filter(d => d.is_active).length;
@@ -464,7 +469,9 @@ export function StaffPage() {
                         <td className="ds-td">
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                             <button onClick={() => setStaffModal(m)} className="ds-icon-btn"><Edit2 size={13} /></button>
-                            <button onClick={() => handleDeleteMember(m)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                            {can('delete:staff') && (
+                              <button onClick={() => handleDeleteMember(m)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                            )}
                           </div>
                         </td>
                       </tr>

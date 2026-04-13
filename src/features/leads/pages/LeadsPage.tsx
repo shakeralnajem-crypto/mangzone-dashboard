@@ -5,6 +5,7 @@ import { useLeads, useOverdueLeads, useCreateLead, useUpdateLead, useDeleteLead,
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { Database } from '@/types/supabase';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
@@ -175,6 +176,7 @@ export function LeadsPage() {
   const convertLead = useConvertLead();
   const updateLead = useUpdateLead();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const handleDelete = async (lead: Lead) => {
     if (!confirm(isAr ? 'حذف هذا العميل؟' : 'Delete this lead?')) return;
@@ -381,9 +383,11 @@ export function LeadsPage() {
                       <button onClick={() => openEdit(lead)} className="ds-icon-btn">
                         <Edit2 size={13} />
                       </button>
-                      <button onClick={() => handleDelete(lead)} className="ds-icon-btn-err">
-                        <Trash2 size={13} />
-                      </button>
+                      {can('delete:lead') && (
+                        <button onClick={() => handleDelete(lead)} className="ds-icon-btn-err">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

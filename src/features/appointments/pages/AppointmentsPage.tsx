@@ -8,6 +8,7 @@ import { useServices } from '@/hooks/useServices';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { Database } from '@/types/supabase';
 
 type Appointment = Database['public']['Tables']['appointments']['Row'];
@@ -477,6 +478,7 @@ export function AppointmentsPage() {
   const updateAppt = useUpdateAppointment();
   const deleteAppt = useDeleteAppointment();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المواعيد.' : 'Failed to load appointments.');
 
@@ -659,9 +661,11 @@ export function AppointmentsPage() {
                         <button onClick={() => openEdit(a)} className="ds-icon-btn" title={isAr ? 'تعديل' : 'Edit'}>
                           <Edit2 size={14} />
                         </button>
-                        <button onClick={() => handleDelete(a)} className="ds-icon-btn-err" title={isAr ? 'حذف' : 'Delete'}>
-                          <Trash2 size={14} />
-                        </button>
+                        {can('delete:appointment') && (
+                          <button onClick={() => handleDelete(a)} className="ds-icon-btn-err" title={isAr ? 'حذف' : 'Delete'}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

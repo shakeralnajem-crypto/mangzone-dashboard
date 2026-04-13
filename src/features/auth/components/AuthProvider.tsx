@@ -31,7 +31,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
           const profile = await authApi.getProfile(session.user.id);
           setAuth(session.user, profile);
-        } catch {
+        } catch (err) {
+          console.error('[auth] INITIAL_SESSION profile fetch failed:', err);
           await authApi.logout().catch(() => {});
           clearAuth();
         }

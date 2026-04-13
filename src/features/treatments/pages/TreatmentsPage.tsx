@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from 'react-i18next';
 import { useT, getStatusLabel } from '@/lib/translations';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -216,6 +217,7 @@ export function TreatmentsPage() {
   const { data: doctors = [] } = useDoctors();
   const create = useCreateTreatmentPlan();
   const remove = useDeleteTreatmentPlan();
+  const { can } = usePermissions();
 
   const filtered = search.trim()
     ? plans.filter(p =>
@@ -361,9 +363,11 @@ export function TreatmentsPage() {
                       <button onClick={() => setEditingPlan(plan)} className="ds-icon-btn">
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => handleDelete(plan)} className="ds-icon-btn-err">
-                        <Trash2 size={14} />
-                      </button>
+                      {can('delete:treatment') && (
+                        <button onClick={() => handleDelete(plan)} className="ds-icon-btn-err">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

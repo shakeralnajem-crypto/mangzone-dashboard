@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { Profile } from '@/types';
 
 export interface LoginCredentials {
   email: string;
@@ -26,14 +27,30 @@ export const authApi = {
     return data.session;
   },
 
-  async getProfile(userId: string) {
+  async getProfile(userId: string): Promise<Profile> {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error('PROFILE_MISSING');
-    return data;
+
+    if (error) {
+      // Log the real Supabase error (RLS, network, JWT, etc.) for debugging,
+      // but throw a recognizable code so LoginPage can show a useful message.
+      console.error('[auth] getProfile error:', error.message, error);
+      throw new Error('PROFILE_FETCH_ERROR');
+    }
+
+    if (!data) {
+      throw new Error('PROFILE_MISSING');
+    }
+
+    const profile = data as Profile;
+
+    if (!profile.is_active) {
+      throw new Error('PROFILE_INACTIVE');
+    }
+
+    return profile;
   },
 };

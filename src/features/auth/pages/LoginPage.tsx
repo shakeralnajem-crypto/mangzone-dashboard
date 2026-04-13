@@ -36,31 +36,41 @@ export function LoginPage() {
       if (!authData?.user) throw new Error('User not found');
       const user = authData.user;
 
-      // Step 2: Fetch profile directly — no waiting on external listeners
+      // Step 2: Fetch profile — must succeed before we commit auth state
       const profile = await authApi.getProfile(user.id);
 
-      // Step 3: Write to store then navigate
+      // Step 3: Commit to store then navigate
       setAuth(user, profile);
       const destination = from === '/' ? '/dashboard' : from;
       navigate(destination, { replace: true });
     } catch (err: unknown) {
-      // Clear any partial session if profile fetch fails
-      await authApi.logout().catch(() => {});
+      console.error('[auth] Login failed:', err);
 
-      const message = err instanceof Error ? err.message : '';
-      if (
-        message.includes('Invalid login credentials') ||
-        message.includes('invalid_grant')
-      ) {
+      // Extract message from any thrown value (Error, AuthApiError, plain object)
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : String(err);
+
+      if (message.includes('Invalid login credentials') || message.includes('invalid_grant')) {
         setError(t('auth.error.invalid_credentials'));
-      } else if (
-        message.includes('PROFILE_MISSING')
-      ) {
+      } else if (message.includes('PROFILE_MISSING')) {
         setError('Profile not found. Ask your administrator to set up your account.');
+      } else if (message.includes('PROFILE_INACTIVE')) {
+        setError('Your account has been deactivated. Contact your administrator.');
+      } else if (message.includes('PROFILE_FETCH_ERROR')) {
+        setError('Could not load your profile. Please try again or contact support.');
       } else {
         setError(t('auth.error.generic'));
       }
+
       setIsSubmitting(false);
+
+      // Clear any partial Supabase session silently — after setting the error so
+      // the SIGNED_OUT event does not interfere with the error state.
+      authApi.logout().catch(() => {});
     }
   };
 

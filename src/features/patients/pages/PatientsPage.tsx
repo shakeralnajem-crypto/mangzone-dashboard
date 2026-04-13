@@ -6,6 +6,7 @@ import { PatientDetailModal } from '@/components/shared/PatientDetailModal';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { Database } from '@/types/supabase';
 
 type Patient = Database['public']['Tables']['patients']['Row'];
@@ -150,6 +151,7 @@ export function PatientsPage() {
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المرضى.' : 'Failed to load patients.');
 
@@ -302,9 +304,11 @@ export function PatientsPage() {
                       <button onClick={() => openEdit(p)} className="ds-icon-btn" title={t.edit}>
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => handleDelete(p)} className="ds-icon-btn-err" title={t.delete}>
-                        <Trash2 size={14} />
-                      </button>
+                      {can('delete:patient') && (
+                        <button onClick={() => handleDelete(p)} className="ds-icon-btn-err" title={t.delete}>
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

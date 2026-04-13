@@ -4,6 +4,7 @@ import { useContentPosts, useCreateContentPost, useUpdateContentPost, useDeleteC
 import { useTranslation } from 'react-i18next';
 import { useT, getStatusLabel } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { Database } from '@/types/supabase';
 
 type ContentPost = Database['public']['Tables']['content_posts']['Row'];
@@ -278,6 +279,7 @@ export function ContentPage() {
   const deletePost = useDeleteContentPost();
   const createPost = useCreateContentPost();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const handleDelete = async (post: ContentPost) => {
     if (!confirm(isAr ? 'حذف هذا المنشور؟' : 'Delete this post?')) return;
@@ -418,7 +420,9 @@ export function ContentPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                       {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
                       <button onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
-                      <button onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                      {can('delete:content') && (
+                        <button onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>

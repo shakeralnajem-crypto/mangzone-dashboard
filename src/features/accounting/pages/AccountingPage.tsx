@@ -11,6 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import { exportToCsv } from '@/lib/exportCsv';
 import type { Database } from '@/types/supabase';
 
@@ -159,6 +160,7 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
   const create = useCreateExpense();
   const remove = useDeleteExpense();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const months = isAr ? MONTHS_AR : MONTHS_EN;
 
@@ -297,31 +299,33 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
                         <button onClick={() => setEditingExpense(exp)} className="ds-icon-btn" title={t.edit}>
                           <Edit2 size={13} />
                         </button>
-                        <button onClick={async () => {
-                          if (!confirm(isAr ? `حذف هذا المصروف؟` : `Delete this expense?`)) return;
-                          await remove.mutateAsync(exp.id);
-                          let restoredId = exp.id;
-                          pushAction({
-                            id: crypto.randomUUID(),
-                            timestamp: Date.now(),
-                            description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
-                            description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
-                            undo: async () => {
-                              const created = await create.mutateAsync({
-                                category: exp.category,
-                                description: exp.description,
-                                amount: exp.amount,
-                                expense_date: exp.expense_date,
-                                paid_to: exp.paid_to,
-                                notes: exp.notes,
-                              });
-                              restoredId = created.id;
-                            },
-                            redo: async () => { await remove.mutateAsync(restoredId); },
-                          });
-                        }} className="ds-icon-btn-err" title={t.delete}>
-                          <Trash2 size={13} />
-                        </button>
+                        {can('delete:expense') && (
+                          <button onClick={async () => {
+                            if (!confirm(isAr ? `حذف هذا المصروف؟` : `Delete this expense?`)) return;
+                            await remove.mutateAsync(exp.id);
+                            let restoredId = exp.id;
+                            pushAction({
+                              id: crypto.randomUUID(),
+                              timestamp: Date.now(),
+                              description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
+                              description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
+                              undo: async () => {
+                                const created = await create.mutateAsync({
+                                  category: exp.category,
+                                  description: exp.description,
+                                  amount: exp.amount,
+                                  expense_date: exp.expense_date,
+                                  paid_to: exp.paid_to,
+                                  notes: exp.notes,
+                                });
+                                restoredId = created.id;
+                              },
+                              redo: async () => { await remove.mutateAsync(restoredId); },
+                            });
+                          }} className="ds-icon-btn-err" title={t.delete}>
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

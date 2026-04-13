@@ -4,6 +4,7 @@ import { useAllServices, useCreateService, useUpdateService, useDeleteService } 
 import { useTranslation } from 'react-i18next';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
+import { usePermissions } from '@/hooks/usePermissions';
 import { formatEGP } from '@/lib/currency';
 import type { Database } from '@/types/supabase';
 
@@ -133,6 +134,7 @@ export function ServicesPage() {
   const update = useUpdateService();
   const remove = useDeleteService();
   const { pushAction } = useHistoryStore();
+  const { can } = usePermissions();
 
   const openAdd = () => { setModalService(null); setModalOpen(true); };
   const openEdit = (s: Service) => { setModalService(s); setModalOpen(true); };
@@ -249,7 +251,9 @@ export function ServicesPage() {
                         {s.is_active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                       </button>
                       <button onClick={() => openEdit(s)} className="ds-icon-btn"><Edit2 size={14} /></button>
-                      <button onClick={() => handleDelete(s)} className="ds-icon-btn-err"><Trash2 size={14} /></button>
+                      {can('delete:service') && (
+                        <button onClick={() => handleDelete(s)} className="ds-icon-btn-err"><Trash2 size={14} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>

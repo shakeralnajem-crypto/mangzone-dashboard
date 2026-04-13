@@ -1,10 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { canAccessPage } from '@/lib/permissions';
 
 export function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, profile } = useAuthStore();
   const location = useLocation();
 
+  // Still resolving the persisted session — show a spinner
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
@@ -16,8 +18,14 @@ export function ProtectedRoute() {
     );
   }
 
+  // Not logged in → redirect to login, preserve the intended destination
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Logged in but role doesn't allow this path → send to dashboard
+  if (!canAccessPage(profile?.role, location.pathname)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
