@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, CalendarDays, ClipboardList, ReceiptText,
   Settings, LogOut, Menu, X, BarChart3, UserCog, Megaphone,
   Sun, Moon, Calculator, Share2, PhoneCall, Stethoscope, Plus,
-  MoreHorizontal,
+  MoreHorizontal, Undo2, Redo2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -16,6 +16,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { authApi } from '@/features/auth/api/auth.api';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -163,11 +164,34 @@ export function AppLayout() {
 
   const meta = pageMeta[location.pathname] ?? { en: 'MANGZONE', ar: 'MANGZONE', sub_en: '', sub_ar: '' };
   const t = useT(isAr);
+  const { past, future, undo, redo, isProcessing } = useHistoryStore();
+  const canUndo = past.length > 0 && !isProcessing;
+  const canRedo = future.length > 0 && !isProcessing;
 
   useEffect(() => {
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
     document.documentElement.lang = i18n.language;
   }, [i18n.language, isAr]);
+
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        await useHistoryStore.getState().undo();
+      }
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) ||
+        ((e.ctrlKey || e.metaKey) && e.key === 'y')
+      ) {
+        e.preventDefault();
+        await useHistoryStore.getState().redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', background: 'var(--bg)' }}>
@@ -222,6 +246,54 @@ export function AppLayout() {
               style={{ padding: '7px 13px', fontSize: 12 }}
             >
               {isAr ? 'EN' : 'عربي'}
+            </button>
+
+            {/* Undo */}
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              title={`Undo${past.length > 0 ? ` (${past.length})` : ''} — Ctrl+Z`}
+              style={{
+                width: 36, height: 36, borderRadius: 10,
+                border: '1px solid var(--brd)',
+                background: canUndo ? 'var(--p-soft)' : 'var(--p-ultra)',
+                color: canUndo ? 'var(--p2)' : 'var(--txt3)',
+                cursor: canUndo ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s', opacity: canUndo ? 1 : 0.45,
+                position: 'relative', flexShrink: 0,
+              }}
+            >
+              <Undo2 size={16} />
+              {past.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: -5, right: -5,
+                  background: 'var(--p2)', color: '#fff',
+                  fontSize: 9, fontWeight: 800,
+                  borderRadius: 20, padding: '1px 4px',
+                  minWidth: 14, textAlign: 'center', lineHeight: '14px',
+                }}>
+                  {past.length}
+                </span>
+              )}
+            </button>
+
+            {/* Redo */}
+            <button
+              onClick={redo}
+              disabled={!canRedo}
+              title={`Redo${future.length > 0 ? ` (${future.length})` : ''} — Ctrl+Shift+Z`}
+              style={{
+                width: 36, height: 36, borderRadius: 10,
+                border: '1px solid var(--brd)',
+                background: 'var(--p-ultra)',
+                color: canRedo ? 'var(--txt2)' : 'var(--txt3)',
+                cursor: canRedo ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s', opacity: canRedo ? 1 : 0.45, flexShrink: 0,
+              }}
+            >
+              <Redo2 size={16} />
             </button>
 
             {/* Theme */}

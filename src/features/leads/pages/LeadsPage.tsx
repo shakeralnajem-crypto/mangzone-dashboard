@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLeads, useOverdueLeads, useCreateLead, useUpdateLead, useDeleteLead, useConvertLead } from '@/hooks/useLeads';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { Database } from '@/types/supabase';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
@@ -172,10 +173,21 @@ export function LeadsPage() {
 
   const deleteLead = useDeleteLead();
   const convertLead = useConvertLead();
+  const updateLead = useUpdateLead();
+  const { pushAction } = useHistoryStore();
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (lead: Lead) => {
     if (!confirm(isAr ? 'حذف هذا العميل؟' : 'Delete this lead?')) return;
-    await deleteLead.mutateAsync(id);
+    await deleteLead.mutateAsync(lead.id);
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted lead: ${lead.name}`,
+      description_ar: `حُذف عميل: ${lead.name}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      undo: async () => { await updateLead.mutateAsync({ id: lead.id, deleted_at: null } as any); },
+      redo: async () => { await deleteLead.mutateAsync(lead.id); },
+    });
   };
 
   const handleConvert = async (lead: Lead) => {
@@ -369,7 +381,7 @@ export function LeadsPage() {
                       <button onClick={() => openEdit(lead)} className="ds-icon-btn">
                         <Edit2 size={13} />
                       </button>
-                      <button onClick={() => handleDelete(lead.id)} className="ds-icon-btn-err">
+                      <button onClick={() => handleDelete(lead)} className="ds-icon-btn-err">
                         <Trash2 size={13} />
                       </button>
                     </div>

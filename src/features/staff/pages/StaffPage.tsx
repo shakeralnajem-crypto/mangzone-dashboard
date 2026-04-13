@@ -8,6 +8,7 @@ import {
 } from '@/hooks/useStaff';
 import { formatEGP } from '@/lib/currency';
 import { useT } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { Database } from '@/types/supabase';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -277,6 +278,9 @@ export function StaffPage() {
   const { data: statsData } = useStaffStats();
   const deleteDoctor = useDeleteDoctor();
   const deleteMember = useDeleteClinicStaff();
+  const createDoctor = useCreateDoctor();
+  const createMember = useCreateClinicStaff();
+  const { pushAction } = useHistoryStore();
 
   const nonDoctors = staff.filter(s => s.role !== 'DOCTOR');
   const activeDoctors = doctors.filter(d => d.is_active).length;
@@ -286,11 +290,47 @@ export function StaffPage() {
   const handleDeleteDoctor = async (doctor: Doctor) => {
     if (!confirm(`${isAr ? 'حذف الطبيب' : 'Delete Dr.'} ${doctor.full_name}?`)) return;
     await deleteDoctor.mutateAsync(doctor.id);
+    let restoredId = doctor.id;
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted doctor: Dr. ${doctor.full_name}`,
+      description_ar: `حُذف الطبيب: د. ${doctor.full_name}`,
+      undo: async () => {
+        const created = await createDoctor.mutateAsync({
+          full_name: doctor.full_name,
+          specialization: doctor.specialization,
+          phone: doctor.phone,
+          email: doctor.email,
+          is_active: doctor.is_active,
+        });
+        restoredId = created.id;
+      },
+      redo: async () => { await deleteDoctor.mutateAsync(restoredId); },
+    });
   };
 
   const handleDeleteMember = async (m: ClinicStaffMember) => {
     if (!confirm(`${isAr ? 'حذف' : 'Delete'} ${m.full_name}?`)) return;
     await deleteMember.mutateAsync(m.id);
+    let restoredId = m.id;
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted staff member: ${m.full_name}`,
+      description_ar: `حُذف عضو الفريق: ${m.full_name}`,
+      undo: async () => {
+        const created = await createMember.mutateAsync({
+          full_name: m.full_name,
+          role: m.role,
+          phone: m.phone,
+          email: m.email,
+          is_active: m.is_active,
+        });
+        restoredId = created.id;
+      },
+      redo: async () => { await deleteMember.mutateAsync(restoredId); },
+    });
   };
 
   return (

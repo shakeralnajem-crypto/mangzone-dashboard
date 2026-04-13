@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useAccounting';
 import { useTranslation } from 'react-i18next';
 import { useT } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import { exportToCsv } from '@/lib/exportCsv';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -46,6 +47,7 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
   const { data: expenses = [], isLoading } = useExpenses(year, month);
   const create = useCreateExpense();
   const remove = useDeleteExpense();
+  const { pushAction } = useHistoryStore();
 
   const months = isAr ? MONTHS_AR : MONTHS_EN;
 
@@ -180,7 +182,28 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
                     <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.paid_to || '—'}</td>
                     <td className="ds-td" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--txt)' }}>{fmt(exp.amount)}</td>
                     <td className="ds-td" style={{ textAlign: 'right' }}>
-                      <button onClick={() => remove.mutate(exp.id)} className="ds-icon-btn-err">
+                      <button onClick={async () => {
+                        await remove.mutateAsync(exp.id);
+                        let restoredId = exp.id;
+                        pushAction({
+                          id: crypto.randomUUID(),
+                          timestamp: Date.now(),
+                          description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
+                          description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
+                          undo: async () => {
+                            const created = await create.mutateAsync({
+                              category: exp.category,
+                              description: exp.description,
+                              amount: exp.amount,
+                              expense_date: exp.expense_date,
+                              paid_to: exp.paid_to,
+                              notes: exp.notes,
+                            });
+                            restoredId = created.id;
+                          },
+                          redo: async () => { await remove.mutateAsync(restoredId); },
+                        });
+                      }} className="ds-icon-btn-err">
                         <Trash2 size={13} />
                       </button>
                     </td>

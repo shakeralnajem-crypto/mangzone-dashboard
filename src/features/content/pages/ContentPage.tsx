@@ -3,6 +3,7 @@ import { Share2, Plus, X, Copy, Check, Edit2, Trash2, List, CalendarDays } from 
 import { useContentPosts, useCreateContentPost, useUpdateContentPost, useDeleteContentPost } from '@/hooks/useContent';
 import { useTranslation } from 'react-i18next';
 import { useT, getStatusLabel } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { Database } from '@/types/supabase';
 
 type ContentPost = Database['public']['Tables']['content_posts']['Row'];
@@ -275,10 +276,33 @@ export function ContentPage() {
   });
 
   const deletePost = useDeleteContentPost();
+  const createPost = useCreateContentPost();
+  const { pushAction } = useHistoryStore();
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (post: ContentPost) => {
     if (!confirm(isAr ? 'حذف هذا المنشور؟' : 'Delete this post?')) return;
-    await deletePost.mutateAsync(id);
+    await deletePost.mutateAsync(post.id);
+    let restoredId = post.id;
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted post: ${post.title ?? post.platform}`,
+      description_ar: `حُذف منشور: ${post.title ?? post.platform}`,
+      undo: async () => {
+        const created = await createPost.mutateAsync({
+          title: post.title,
+          caption: post.caption,
+          hashtags: post.hashtags,
+          platform: post.platform,
+          status: post.status,
+          scheduled_date: post.scheduled_date,
+          post_type: post.post_type,
+          notes: post.notes,
+        });
+        restoredId = created.id;
+      },
+      redo: async () => { await deletePost.mutateAsync(restoredId); },
+    });
   };
 
   const openAdd = () => { setEditingPost(null); setModalOpen(true); };
@@ -394,7 +418,7 @@ export function ContentPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                       {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
                       <button onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
-                      <button onClick={() => handleDelete(post.id)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                      <button onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
                     </div>
                   </td>
                 </tr>

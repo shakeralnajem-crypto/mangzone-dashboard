@@ -7,6 +7,7 @@ import { useDoctors } from '@/hooks/useStaff';
 import { useServices } from '@/hooks/useServices';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { Database } from '@/types/supabase';
 
 type Appointment = Database['public']['Tables']['appointments']['Row'];
@@ -475,16 +476,39 @@ export function AppointmentsPage() {
 
   const updateAppt = useUpdateAppointment();
   const deleteAppt = useDeleteAppointment();
+  const { pushAction } = useHistoryStore();
 
   const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المواعيد.' : 'Failed to load appointments.');
 
-  const handleStatusChange = (id: string, status: string) => {
-    updateAppt.mutate({ id, values: { status: status as ApptStatus } });
+  const handleStatusChange = (id: string, newStatus: string) => {
+    const appt = allAppointments.find(a => a.id === id);
+    const oldStatus = (appt?.status ?? 'SCHEDULED') as ApptStatus;
+    updateAppt.mutate({ id, values: { status: newStatus as ApptStatus } });
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Changed appointment status to ${newStatus}`,
+      description_ar: `تغيير حالة الموعد إلى ${newStatus}`,
+      undo: async () => { await updateAppt.mutateAsync({ id, values: { status: oldStatus } }); },
+      redo: async () => { await updateAppt.mutateAsync({ id, values: { status: newStatus as ApptStatus } }); },
+    });
   };
 
   const handleDelete = async (a: Appointment) => {
     if (!confirm(isAr ? 'حذف هذا الموعد؟' : 'Delete this appointment?')) return;
+    const patientName = (a as RichAppt).patient
+      ? `${(a as RichAppt).patient!.first_name} ${(a as RichAppt).patient!.last_name}`
+      : (a.walk_in_name ?? '—');
     await deleteAppt.mutateAsync(a.id);
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted appointment: ${patientName}`,
+      description_ar: `حُذف موعد: ${patientName}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      undo: async () => { await updateAppt.mutateAsync({ id: a.id, values: { deleted_at: null } as any }); },
+      redo: async () => { await deleteAppt.mutateAsync(a.id); },
+    });
   };
 
   const handleExport = () => {

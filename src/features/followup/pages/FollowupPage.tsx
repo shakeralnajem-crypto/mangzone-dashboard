@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useFollowups, useFollowupStats, useAutoGenerateFollowups, useUpdateFollowupStatus } from '@/hooks/useFollowups';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { FollowupLead } from '@/hooks/useFollowups';
 
 type TabFilter = 'all' | 'pending' | 'overdue' | 'done';
@@ -36,6 +37,19 @@ export function FollowupPage() {
   const { data: stats } = useFollowupStats();
   const autoGenerate = useAutoGenerateFollowups();
   const updateStatus = useUpdateFollowupStatus();
+  const { pushAction } = useHistoryStore();
+
+  const handleStatusChange = (id: string, oldStatus: string, newStatus: string) => {
+    updateStatus.mutate({ id, status: newStatus });
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Changed follow-up status to ${newStatus}`,
+      description_ar: `تغيير حالة المتابعة إلى ${newStatus}`,
+      undo: async () => { await updateStatus.mutateAsync({ id, status: oldStatus }); },
+      redo: async () => { await updateStatus.mutateAsync({ id, status: newStatus }); },
+    });
+  };
 
   const filtered: FollowupLead[] = activeTab === 'all'
     ? followups
@@ -190,7 +204,7 @@ export function FollowupPage() {
                   <td className="ds-td">
                     <select
                       value={f.status}
-                      onChange={e => updateStatus.mutate({ id: f.id, status: e.target.value })}
+                      onChange={e => handleStatusChange(f.id, f.status, e.target.value)}
                       className={STATUS_CLS[f.status] ?? 'ds-badge ds-badge-neutral'}
                       style={{ border: 'none', cursor: 'pointer', outline: 'none', background: 'transparent' }}
                     >

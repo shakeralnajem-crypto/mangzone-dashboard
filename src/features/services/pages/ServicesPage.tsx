@@ -3,6 +3,7 @@ import { Stethoscope, Plus, X, Edit2, Trash2, ToggleLeft, ToggleRight } from 'lu
 import { useAllServices, useCreateService, useUpdateService, useDeleteService } from '@/hooks/useServices';
 import { useTranslation } from 'react-i18next';
 import { useT } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import { formatEGP } from '@/lib/currency';
 import type { Database } from '@/types/supabase';
 
@@ -131,19 +132,40 @@ export function ServicesPage() {
   const { data: services = [], isLoading, error } = useAllServices();
   const update = useUpdateService();
   const remove = useDeleteService();
+  const { pushAction } = useHistoryStore();
 
   const openAdd = () => { setModalService(null); setModalOpen(true); };
   const openEdit = (s: Service) => { setModalService(s); setModalOpen(true); };
   const closeModal = () => setModalOpen(false);
 
-  const toggleActive = (s: Service) => update.mutate({ id: s.id, is_active: !s.is_active });
+  const toggleActive = (s: Service) => {
+    const newActive = !s.is_active;
+    update.mutate({ id: s.id, is_active: newActive });
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `${newActive ? 'Activated' : 'Deactivated'} service: ${s.name}`,
+      description_ar: `${newActive ? 'تفعيل' : 'تعطيل'} خدمة: ${s.name}`,
+      undo: async () => { await update.mutateAsync({ id: s.id, is_active: s.is_active }); },
+      redo: async () => { await update.mutateAsync({ id: s.id, is_active: newActive }); },
+    });
+  };
 
-  const handleDelete = (s: Service) => {
+  const handleDelete = async (s: Service) => {
     const msg = isAr
       ? `حذف خدمة "${s.name}"؟ لا يمكن التراجع.`
       : `Delete service "${s.name}"? This cannot be undone.`;
     if (!confirm(msg)) return;
-    remove.mutate(s.id);
+    await remove.mutateAsync(s.id);
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted service: ${s.name}`,
+      description_ar: `حُذفت خدمة: ${s.name}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      undo: async () => { await update.mutateAsync({ id: s.id, deleted_at: null } as any); },
+      redo: async () => { await remove.mutateAsync(s.id); },
+    });
   };
 
   return (

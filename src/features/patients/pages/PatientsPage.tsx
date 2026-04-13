@@ -5,6 +5,7 @@ import { usePatients, useCreatePatient, useUpdatePatient, useDeletePatient } fro
 import { PatientDetailModal } from '@/components/shared/PatientDetailModal';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT } from '@/lib/translations';
+import { useHistoryStore } from '@/store/historyStore';
 import type { Database } from '@/types/supabase';
 
 type Patient = Database['public']['Tables']['patients']['Row'];
@@ -147,6 +148,8 @@ export function PatientsPage() {
 
   const { data: patients = [], isLoading, error } = usePatients(search);
   const deletePatient = useDeletePatient();
+  const updatePatient = useUpdatePatient();
+  const { pushAction } = useHistoryStore();
 
   const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المرضى.' : 'Failed to load patients.');
 
@@ -164,6 +167,16 @@ export function PatientsPage() {
   const handleDelete = async (p: Patient) => {
     if (!confirm(`${isAr ? 'حذف المريض' : 'Delete patient'} "${p.first_name} ${p.last_name}"?`)) return;
     await deletePatient.mutateAsync(p.id);
+    const name = `${p.first_name} ${p.last_name}`;
+    pushAction({
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      description: `Deleted patient: ${name}`,
+      description_ar: `حُذف مريض: ${name}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      undo: async () => { await updatePatient.mutateAsync({ id: p.id, values: { deleted_at: null } as any }); },
+      redo: async () => { await deletePatient.mutateAsync(p.id); },
+    });
   };
 
   const openAdd = () => { setEditingPatient(null); setModalOpen(true); };
