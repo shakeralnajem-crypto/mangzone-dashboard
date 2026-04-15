@@ -10,13 +10,33 @@ type AppointmentInsert = Database['public']['Tables']['appointments']['Insert'];
 const db = supabase as any;
 
 type AppointmentWithRelations = Appointment & {
-  patient: { first_name: string; last_name: string; phone?: string | null } | null;
+  patient: {
+    first_name: string;
+    last_name: string;
+    phone?: string | null;
+  } | null;
   doctor: { full_name: string } | null;
   doctor_ref: { full_name: string } | null;
   service: { name: string } | null;
 };
 
-export function useAppointments(filters?: { search?: string; doctorId?: string; status?: string }) {
+function validateAppointmentTimeRange(values: Partial<AppointmentInsert>) {
+  if (!values.start_time || !values.end_time) return;
+  const start = new Date(values.start_time).getTime();
+  const end = new Date(values.end_time).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    throw new Error('Invalid appointment time.');
+  }
+  if (end <= start) {
+    throw new Error('Appointment end time must be after start time.');
+  }
+}
+
+export function useAppointments(filters?: {
+  search?: string;
+  doctorId?: string;
+  status?: string;
+}) {
   const clinicId = useAuthStore((s) => s.profile?.clinic_id);
 
   return useQuery({
@@ -25,19 +45,21 @@ export function useAppointments(filters?: { search?: string; doctorId?: string; 
     queryFn: async () => {
       let q = db
         .from('appointments')
-        .select(`
+        .select(
+          `
           *,
           patient:patients(first_name, last_name, phone),
           doctor:profiles!appointments_doctor_id_fkey(full_name),
           doctor_ref:doctors!appointments_doctor_ref_id_fkey(full_name),
           service:services(name)
-        `)
+        `
+        )
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
         .order('start_time', { ascending: false });
 
       if (filters?.doctorId) q = q.eq('doctor_ref_id', filters.doctorId);
-      if (filters?.status)   q = q.eq('status', filters.status);
+      if (filters?.status) q = q.eq('status', filters.status);
       if (filters?.search?.trim()) {
         q = q.or(`walk_in_name.ilike.%${filters.search}%`);
       }
@@ -59,13 +81,15 @@ export function useTodayAppointments() {
     queryFn: async () => {
       const { data, error } = await db
         .from('appointments')
-        .select(`
+        .select(
+          `
           *,
           patient:patients(first_name, last_name),
           doctor:profiles!appointments_doctor_id_fkey(full_name),
           doctor_ref:doctors!appointments_doctor_ref_id_fkey(full_name),
           service:services(name)
-        `)
+        `
+        )
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
         .gte('start_time', `${today}T00:00:00`)
@@ -83,60 +107,101 @@ export function useCreateAppointment() {
   const { profile } = useAuthStore();
 
   return useMutation({
-    mutationFn: async (values: Omit<AppointmentInsert, 'clinic_id' | 'created_by'>) => {
+    mutationFn: async (
+      values: Omit<AppointmentInsert, 'clinic_id' | 'created_by'>
+    ) => {
+      validateAppointmentTimeRange(values);
+
       const { data, error } = await db
         .from('appointments')
-        .insert({ ...values, clinic_id: profile!.clinic_id, created_by: profile!.id })
+        .insert({
+          ...values,
+          clinic_id: profile!.clinic_id,
+          created_by: profile!.id,
+        })
         .select()
         .single();
       if (error) throw error;
       return data as Appointment;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-summary'] });
+    },
   });
 }
 
 export function useUpdateAppointment() {
   const qc = useQueryClient();
+  const clinicId = useAuthStore((s) => s.profile?.clinic_id);
 
   return useMutation({
-    mutationFn: async ({ id, values }: { id: string; values: Partial<AppointmentInsert> }) => {
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: Partial<AppointmentInsert>;
+    }) => {
+      if (!clinicId) throw new Error('Missing clinic context.');
+      validateAppointmentTimeRange(values);
+
       const { error } = await db
         .from('appointments')
         .update(values)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('clinic_id', clinicId);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-summary'] });
+    },
   });
 }
 
 export function useDeleteAppointment() {
   const qc = useQueryClient();
+  const clinicId = useAuthStore((s) => s.profile?.clinic_id);
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (!clinicId) throw new Error('Missing clinic context.');
       const { error } = await db
         .from('appointments')
         .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('clinic_id', clinicId);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-summary'] });
+    },
   });
 }
 
 export function useUpdateAppointmentStatus() {
   const qc = useQueryClient();
+  const clinicId = useAuthStore((s) => s.profile?.clinic_id);
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      if (!clinicId) throw new Error('Missing clinic context.');
       const { error } = await db
         .from('appointments')
         .update({ status })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('clinic_id', clinicId);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-appointments'] });
+      qc.invalidateQueries({ queryKey: ['patient-summary'] });
+    },
   });
 }

@@ -69,20 +69,37 @@ export function usePatients(search = '') {
   });
 }
 
+function validateDobNotFuture(dob?: string | null) {
+  if (!dob) return;
+  const value = dob.slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  if (value > today) {
+    throw new Error('Date of birth cannot be in the future.');
+  }
+}
+
 export function useCreatePatient() {
   const qc = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
 
   return useMutation({
-    mutationFn: async (values: Omit<PatientInsert, 'clinic_id' | 'created_by'>): Promise<Patient> => {
+    mutationFn: async (
+      values: Omit<PatientInsert, 'clinic_id' | 'created_by'>
+    ): Promise<Patient> => {
       if (!profile?.clinic_id || !profile.id) {
         throw new Error('Missing clinic context for creating a patient.');
       }
 
       try {
+        validateDobNotFuture(values.dob ?? null);
+
         const { data, error } = await db
           .from('patients')
-          .insert({ ...values, clinic_id: profile.clinic_id, created_by: profile.id })
+          .insert({
+            ...values,
+            clinic_id: profile.clinic_id,
+            created_by: profile.id,
+          })
           .select();
 
         if (error) {
@@ -108,8 +125,18 @@ export function useUpdatePatient() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, values }: { id: string; values: Partial<PatientInsert> }) => {
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: Partial<PatientInsert>;
+    }) => {
       try {
+        if (Object.prototype.hasOwnProperty.call(values, 'dob')) {
+          validateDobNotFuture(values.dob ?? null);
+        }
+
         const { data, error } = await db
           .from('patients')
           .update(values)
