@@ -54,14 +54,23 @@ export function LoginPage() {
             ? String((err as { message: unknown }).message)
             : String(err);
 
-      if (message.includes('Invalid login credentials') || message.includes('invalid_grant')) {
+      if (
+        message.includes('Invalid login credentials') ||
+        message.includes('invalid_grant')
+      ) {
         setError(t('auth.error.invalid_credentials'));
       } else if (message.includes('PROFILE_MISSING')) {
-        setError('Profile not found. Ask your administrator to set up your account.');
+        setError(
+          'Profile not found. Ask your administrator to set up your account.'
+        );
       } else if (message.includes('PROFILE_INACTIVE')) {
-        setError('Your account has been deactivated. Contact your administrator.');
+        setError(
+          'Your account has been deactivated. Contact your administrator.'
+        );
       } else if (message.includes('PROFILE_FETCH_ERROR')) {
-        setError('Could not load your profile. Please try again or contact support.');
+        setError(
+          'Could not load your profile. Please try again or contact support.'
+        );
       } else {
         setError(t('auth.error.generic'));
       }
@@ -80,7 +89,10 @@ export function LoginPage() {
   };
 
   return (
-    <div className={`flex min-h-screen ${isRtl ? 'font-arabic' : 'font-sans'}`} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div
+      className={`flex min-h-screen ${isRtl ? 'font-arabic' : 'font-sans'}`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+    >
       {/* Left panel — brand showcase */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] relative overflow-hidden">
         {/* Gradient background matching logo colors */}
@@ -113,8 +125,20 @@ export function LoginPage() {
             {/* Feature pills */}
             <div className="flex flex-wrap gap-2 pt-2">
               {(isRtl
-                ? ['إدارة المرضى', 'جدولة المواعيد', 'خطط العلاج', 'الفواتير', 'التقارير']
-                : ['Patient Management', 'Appointment Scheduling', 'Treatment Plans', 'Billing', 'Reports']
+                ? [
+                    'إدارة المرضى',
+                    'جدولة المواعيد',
+                    'خطط العلاج',
+                    'الفواتير',
+                    'التقارير',
+                  ]
+                : [
+                    'Patient Management',
+                    'Appointment Scheduling',
+                    'Treatment Plans',
+                    'Billing',
+                    'Reports',
+                  ]
               ).map((label) => (
                 <span
                   key={label}
@@ -127,7 +151,8 @@ export function LoginPage() {
           </div>
           <div>
             <p className="text-sm text-white/50">
-              © {new Date().getFullYear()} MANGZONE. {isRtl ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
+              © {new Date().getFullYear()} MANGZONE.{' '}
+              {isRtl ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
             </p>
           </div>
         </div>
@@ -153,7 +178,9 @@ export function LoginPage() {
 
           {/* Heading */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">{t('auth.welcome')}</h2>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {t('auth.welcome')}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">{t('auth.subtitle')}</p>
           </div>
 
@@ -165,6 +192,7 @@ export function LoginPage() {
               <div className="relative">
                 <Mail className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
+                  data-testid="login-email"
                   id="email"
                   type="email"
                   value={email}
@@ -192,6 +220,7 @@ export function LoginPage() {
               <div className="relative">
                 <Lock className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
+                  data-testid="login-password"
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -207,7 +236,11 @@ export function LoginPage() {
                   className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -221,6 +254,7 @@ export function LoginPage() {
 
             {/* Submit */}
             <Button
+              data-testid="login-submit"
               type="submit"
               className="w-full bg-gradient-to-r from-indigo-500 via-purple-600 to-fuchsia-500 hover:from-indigo-600 hover:via-purple-700 hover:to-fuchsia-600 text-white border-0 font-semibold h-11 shadow-md shadow-purple-200"
               disabled={isSubmitting}
