@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -46,7 +46,6 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: '/',             element: <Navigate to="/dashboard" replace /> },
           { path: '/dashboard',    element: <SuspenseWrapper><DashboardPage /></SuspenseWrapper> },
           { path: '/appointments', element: <SuspenseWrapper><AppointmentsPage /></SuspenseWrapper> },
           { path: '/patients',     element: <SuspenseWrapper><PatientsPage /></SuspenseWrapper> },
