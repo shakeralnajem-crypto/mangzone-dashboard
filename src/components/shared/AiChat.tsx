@@ -2,19 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User, Minimize2 } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useAuthStore } from '@/store/authStore';
+import { useTranslation } from 'react-i18next';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
 }
-
-const SUGGESTIONS = [
-  "How many patients do we have?",
-  "What's today's appointment count?",
-  "Show me unpaid invoices count",
-  "What's this month's revenue?",
-];
 
 function renderContent(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -35,21 +29,67 @@ function renderContent(text: string) {
   });
 }
 
+const WELCOME_MSG = (isAr: boolean) =>
+  isAr
+    ? "مرحباً! أنا مساعد MANGZONE. اسألني عن المرضى، المواعيد، الإيرادات، أو أي إحصائيات."
+    : "Hello! I\'m your MANGZONE assistant. Ask me about patients, appointments, revenue, or any clinic stats.";
+
+const SUGGESTIONS_EN = [
+  "How many patients do we have?",
+  "What\'s today\'s appointment count?",
+  "Show me unpaid invoices count",
+  "What\'s this month\'s revenue?",
+];
+const SUGGESTIONS_AR = [
+  "كم عدد المرضى؟",
+  "كم عدد مواعيد اليوم؟",
+  "أظهر لي الفواتير غير المدفوعة",
+  "ما هي إيرادات هذا الشهر؟",
+];
+
 export function AiChat() {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+
+  const { profile } = useAuthStore();
+  const { data: stats } = useDashboardStats();
+
+  // Reset messages when user changes
+  const userId = profile?.id ?? null;
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
+
+  const makeWelcome = (ar: boolean): Message => ({
+    id: '0',
+    role: 'assistant',
+    content: WELCOME_MSG(ar),
+  });
+
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: "Hello! I'm your MANGZONE assistant. Ask me about patients, appointments, revenue, or any clinic stats.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([makeWelcome(isAr)]);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { data: stats } = useDashboardStats();
-  const { profile } = useAuthStore();
+
+  // Clear chat when user changes (login/logout/switch)
+  useEffect(() => {
+    if (userId !== lastUserId) {
+      setLastUserId(userId);
+      setMessages([makeWelcome(isAr)]);
+      setOpen(false);
+    }
+  }, [userId]);
+
+  // Update welcome message when language changes
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].id === '0') {
+        return [makeWelcome(isAr)];
+      }
+      return prev;
+    });
+  }, [isAr]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
@@ -61,12 +101,15 @@ export function AiChat() {
 
   const buildSystemPrompt = () => {
     const egp = stats ? new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue) : 'N/A';
+    const lang = isAr ? 'Arabic' : 'English';
     return `You are a helpful AI assistant for MANGZONE, a dental clinic management system in Egypt.
-You assist clinic staff (admins, doctors, receptionists, accountants) with clinic operations, patient management, appointments, billing, and general dental practice questions.
+You assist clinic staff with clinic operations, patient management, appointments, billing, and dental practice questions.
+
+IMPORTANT: Always respond in ${lang}. If the user writes in Arabic, respond in Arabic. If in English, respond in English.
 
 Current clinic stats:
 - Total patients: ${stats?.totalPatients ?? 'unknown'}
-- Today's appointments: ${stats?.todayAppointments ?? 'unknown'}
+- Today\'s appointments: ${stats?.todayAppointments ?? 'unknown'}
 - Cancelled today: ${stats?.cancelledToday ?? 'unknown'}
 - Unpaid invoices: ${stats?.unpaidInvoices ?? 'unknown'}
 - New leads: ${stats?.newLeads ?? 'unknown'}
@@ -74,7 +117,40 @@ Current clinic stats:
 
 Logged-in user: ${profile?.full_name ?? 'Unknown'} (${profile?.role ?? 'Unknown'})
 
-Respond concisely and helpfully. Use EGP for currency. Keep responses focused on dental clinic operations. If asked about something outside your knowledge, acknowledge it politely.`;
+Respond concisely and helpfully. Use EGP for currency. Keep responses focused on dental clinic operations.`;
+  };
+
+  const getFallbackReply = (q: string): string => {
+    const lower = q.toLowerCase();
+    if (!stats) return isAr ? "لا تتوفر إحصائيات حالياً." : "No stats available right now.";
+
+    const egp = new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue);
+
+    if (lower.includes('patient') || lower.includes('مريض') || lower.includes('مرضى'))
+      return isAr ? `عدد المرضى النشطين: **${stats.totalPatients}** مريض.` : `The clinic has **${stats.totalPatients}** active patients.`;
+
+    if (lower.includes('appointment') || lower.includes('موعد') || lower.includes('مواعيد'))
+      return isAr
+        ? `مواعيد اليوم: **${stats.todayAppointments}**، منها **${stats.cancelledToday}** ملغي.`
+        : `There are **${stats.todayAppointments}** appointments today, with **${stats.cancelledToday}** cancelled.`;
+
+    if (lower.includes('invoice') || lower.includes('unpaid') || lower.includes('فاتورة') || lower.includes('مدفوع'))
+      return isAr ? `عدد الفواتير غير المدفوعة: **${stats.unpaidInvoices}**.` : `There are **${stats.unpaidInvoices}** unpaid/partially paid invoices.`;
+
+    if (lower.includes('revenue') || lower.includes('income') || lower.includes('إيراد') || lower.includes('دخل'))
+      return isAr ? `إيرادات الشهر: **${egp} جنيه**.` : `This month\'s revenue is **${egp} EGP**.`;
+
+    if (lower.includes('lead') || lower.includes('عميل'))
+      return isAr ? `عدد العملاء المحتملين الجدد: **${stats.newLeads}**.` : `There are **${stats.newLeads}** new leads awaiting follow-up.`;
+
+    if (lower.includes('summary') || lower.includes('overview') || lower.includes('ملخص'))
+      return isAr
+        ? `**ملخص العيادة**\n\n• المرضى: **${stats.totalPatients}**\n• مواعيد اليوم: **${stats.todayAppointments}**\n• فواتير معلقة: **${stats.unpaidInvoices}**\n• عملاء جدد: **${stats.newLeads}**\n• إيرادات الشهر: **${egp} جنيه**`
+        : `**Clinic Summary**\n\n• Patients: **${stats.totalPatients}**\n• Today\'s appts: **${stats.todayAppointments}**\n• Unpaid invoices: **${stats.unpaidInvoices}**\n• New leads: **${stats.newLeads}**\n• Monthly revenue: **${egp} EGP**`;
+
+    return isAr
+      ? "يمكنني مساعدتك في عدد المرضى، المواعيد، الإيرادات، والفواتير. جرب أحد الاقتراحات."
+      : "I can help with patient counts, appointments, revenue, and invoices. Try asking one of the suggestions above.";
   };
 
   const handleSend = async (text?: string) => {
@@ -89,24 +165,7 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
 
     if (!apiKey) {
-      // Fallback: keyword-based responses when no API key
-      const q = content.toLowerCase();
-      let reply = "I can help with patient counts, appointments, revenue, and invoices. Try asking one of the suggestions above.";
-
-      if (stats) {
-        if (q.includes('patient')) reply = `The clinic has **${stats.totalPatients}** active patients.`;
-        else if (q.includes('appointment')) reply = `There are **${stats.todayAppointments}** appointments today, with **${stats.cancelledToday}** cancelled.`;
-        else if (q.includes('invoice') || q.includes('unpaid')) reply = `There are **${stats.unpaidInvoices}** unpaid/partially paid invoices.`;
-        else if (q.includes('revenue') || q.includes('income')) {
-          const egp = new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue);
-          reply = `This month's revenue is **${egp} EGP**.`;
-        } else if (q.includes('lead')) reply = `There are **${stats.newLeads}** new leads awaiting follow-up.`;
-        else if (q.includes('summary') || q.includes('overview')) {
-          const egp = new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue);
-          reply = `**Clinic Summary**\n\n• Patients: **${stats.totalPatients}**\n• Today's appts: **${stats.todayAppointments}**\n• Unpaid invoices: **${stats.unpaidInvoices}**\n• New leads: **${stats.newLeads}**\n• Monthly revenue: **${egp} EGP**`;
-        }
-      }
-
+      const reply = getFallbackReply(content);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
       setIsLoading(false);
       return;
@@ -116,7 +175,6 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
       const historyForApi = messages
         .filter(m => m.id !== '0')
         .map(m => ({ role: m.role, content: m.content }));
-
       historyForApi.push({ role: 'user', content });
 
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -135,18 +193,16 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`API error ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`API error ${res.status}`);
 
       const data = await res.json() as { content: { type: string; text: string }[] };
-      const reply = data.content.find(b => b.type === 'text')?.text ?? 'Sorry, I could not generate a response.';
+      const reply = data.content.find(b => b.type === 'text')?.text ?? (isAr ? 'عذراً، لم أتمكن من الرد.' : 'Sorry, I could not generate a response.');
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
-    } catch (err) {
+    } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please check your API key or try again.',
+        content: isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'Sorry, I encountered an error. Please try again.',
       }]);
     } finally {
       setIsLoading(false);
@@ -160,21 +216,23 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
     }
   };
 
+  const SUGGESTIONS = isAr ? SUGGESTIONS_AR : SUGGESTIONS_EN;
+
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={() => setOpen(v => !v)}
         className="fixed bottom-6 end-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg hover:opacity-90 hover:scale-105 transition-all duration-200"
-        title="Open AI Assistant"
+        title={isAr ? 'المساعد الذكي' : 'Open AI Assistant'}
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </button>
 
-      {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-24 end-6 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
-          {/* Header */}
+        <div
+          className="fixed bottom-24 end-6 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+          dir={isAr ? 'rtl' : 'ltr'}
+        >
           <div className="flex items-center justify-between bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
@@ -182,7 +240,7 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">MANGZONE AI</p>
-                <p className="text-xs text-indigo-200">Clinic Assistant</p>
+                <p className="text-xs text-indigo-200">{isAr ? 'المساعد الذكي' : 'Clinic Assistant'}</p>
               </div>
             </div>
             <button
@@ -193,7 +251,6 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
             </button>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-80">
             {messages.map(msg => (
               <div
@@ -235,7 +292,6 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
             <div ref={bottomRef} />
           </div>
 
-          {/* Suggestions */}
           {messages.length <= 1 && (
             <div className="px-4 pb-2 flex flex-wrap gap-1.5">
               {SUGGESTIONS.map(s => (
@@ -250,14 +306,13 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
             </div>
           )}
 
-          {/* Input */}
           <div className="border-t border-slate-100 dark:border-slate-800 p-3 flex items-center gap-2">
             <input
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything..."
+              placeholder={isAr ? 'اسأل أي شيء...' : 'Ask anything...'}
               disabled={isLoading}
               className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-60"
             />
