@@ -149,9 +149,9 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {/* KPI Grid — columns collapse when fewer cards are visible */}
+      {/* KPI Grid — auto-fill collapses on small screens */}
       {kpis.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(kpis.length, 3)}, 1fr)`, gap: 14 }}>
+        <div className="stats-grid">
           {kpis.map(({ color, iconBg, iconClr, Icon, label, val, sub, delay }) => (
             <div key={label} className={`ds-stat ${color}`} style={{ animationDelay: delay }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -173,7 +173,8 @@ export function DashboardPage() {
 
       {/* Row: Schedule + Quick Actions */}
       {(showAppointments || quickActions.length > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: twoColIf(showAppointments, quickActions.length > 0), gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: twoColIf(showAppointments, quickActions.length > 0), gap: 18, gridAutoRows: 'auto' }}
+          className="dashboard-main-grid">
 
           {/* Today's Schedule */}
           {showAppointments && (
