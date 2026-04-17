@@ -162,9 +162,9 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
     setInput('');
     setIsLoading(true);
 
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
-    if (!apiKey) {
+    if (!geminiKey) {
       const reply = getFallbackReply(content);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
       setIsLoading(false);
@@ -172,31 +172,35 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
     }
 
     try {
-      const historyForApi = messages
+      const systemPrompt = buildSystemPrompt();
+      const historyParts = messages
         .filter(m => m.id !== '0')
-        .map(m => ({ role: m.role, content: m.content }));
-      historyForApi.push({ role: 'user', content });
+        .map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }],
+        }));
+      historyParts.push({ role: 'user', parts: [{ text: content }] });
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5',
-          max_tokens: 512,
-          system: buildSystemPrompt(),
-          messages: historyForApi,
-        }),
-      });
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: historyParts,
+            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+          }),
+        }
+      );
 
-      if (!res.ok) throw new Error(`API error ${res.status}`);
+      if (!res.ok) throw new Error(`Gemini API error ${res.status}`);
 
-      const data = await res.json() as { content: { type: string; text: string }[] };
-      const reply = data.content.find(b => b.type === 'text')?.text ?? (isAr ? 'عذراً، لم أتمكن من الرد.' : 'Sorry, I could not generate a response.');
+      const data = await res.json() as {
+        candidates: { content: { parts: { text: string }[] } }[];
+      };
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text
+        ?? (isAr ? 'عذراً، لم أتمكن من الرد.' : 'Sorry, I could not generate a response.');
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
     } catch {
       setMessages(prev => [...prev, {

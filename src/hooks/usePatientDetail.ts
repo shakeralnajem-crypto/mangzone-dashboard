@@ -153,10 +153,6 @@ export function usePatientSummary(patientId: string | null) {
           .eq('patient_id', patientId!)
           .eq('clinic_id', clinicId!)
       ]);
-
-      console.log('[summary] appointmentsRes', { data: appointmentsRes.data, error: appointmentsRes.error });
-      console.log('[summary] invoicesRes', { data: invoicesRes.data, error: invoicesRes.error });
-
       if (appointmentsRes.error) throw appointmentsRes.error;
       if (invoicesRes.error) throw invoicesRes.error;
 
