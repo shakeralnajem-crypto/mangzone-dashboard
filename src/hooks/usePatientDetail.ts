@@ -64,17 +64,6 @@ export function usePatientAppointments(patientId: string | null) {
         .is('deleted_at', null)
         .order('start_time', { ascending: false });
       if (error) throw error;
-      console.debug('[usePatientAppointments] rows', {
-        patientId,
-        clinicId,
-        count: (data ?? []).length,
-        rows: (data ?? []).slice(0, 10).map((r: any) => ({
-          id: r.id,
-          patient_id: r.patient_id,
-          clinic_id: r.clinic_id,
-          status: r.status,
-        })),
-      });
       return data as PatientAppointment[];
     },
   });
@@ -97,19 +86,6 @@ export function usePatientInvoices(patientId: string | null) {
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      console.debug('[usePatientInvoices] rows', {
-        patientId,
-        clinicId,
-        count: (data ?? []).length,
-        rows: (data ?? []).slice(0, 10).map((r: any) => ({
-          id: r.id,
-          patient_id: r.patient_id,
-          clinic_id: r.clinic_id,
-          total_amount: r.total_amount,
-          status: r.status,
-          balance_due: r.balance_due,
-        })),
-      });
       return data as PatientInvoice[];
     },
   });
@@ -122,7 +98,6 @@ export function usePatientPayments(patientId: string | null) {
     queryKey: ['patient-payments', clinicId, patientId],
     enabled: !!patientId && !!clinicId,
     queryFn: async () => {
-      // Step 1: get invoice IDs for this patient
       const { data: invoices, error: invErr } = await db
         .from('invoices')
         .select('id')
@@ -135,13 +110,11 @@ export function usePatientPayments(patientId: string | null) {
 
       const invoiceIds = (invoices as { id: string }[]).map((i) => i.id);
 
-      // Step 2: fetch payments for those invoices (and current clinic only)
       const { data: payments, error: payErr } = await db
         .from('payments')
-        .select('id, amount, payment_method, payment_date, notes, invoice_id')
+        .select('id, amount, payment_method, payment_date, invoice_id')
         .eq('clinic_id', clinicId!)
         .in('invoice_id', invoiceIds)
-        .is('deleted_at', null)
         .order('payment_date', { ascending: false });
       if (payErr) throw payErr;
 
@@ -153,22 +126,24 @@ export function usePatientPayments(patientId: string | null) {
 export function usePatientSummary(patientId: string | null) {
   const clinicId = useAuthStore((s) => s.profile?.clinic_id);
 
-  return useQuery({
+  return useQuery<PatientSummary>({
     queryKey: ['patient-summary', clinicId, patientId],
     enabled: !!patientId && !!clinicId,
     queryFn: async (): Promise<PatientSummary> => {
+      console.log('[summary] queryFn start', { patientId, clinicId });
+
       const [appointmentsRes, invoicesRes] = await Promise.all([
         db
           .from('appointments')
           .select(
             `
-            id, patient_id, clinic_id, start_time, status, notes,
-            doctor:profiles!appointments_doctor_id_fkey(full_name),
-            service:services(name)
-          `
+          id, patient_id, clinic_id, start_time, status, notes,
+          doctor:profiles!appointments_doctor_id_fkey(full_name),
+          service:services(name)
+        `
           )
           .eq('patient_id', patientId!)
-          .is('deleted_at', null)
+          .eq('clinic_id', clinicId!)
           .order('start_time', { ascending: false }),
         db
           .from('invoices')
@@ -176,69 +151,60 @@ export function usePatientSummary(patientId: string | null) {
             'id, patient_id, clinic_id, invoice_number, total_amount, balance_due, status, due_date, created_at'
           )
           .eq('patient_id', patientId!)
-          .is('deleted_at', null),
+          .eq('clinic_id', clinicId!)
       ]);
+
+      console.log('[summary] appointmentsRes', { data: appointmentsRes.data, error: appointmentsRes.error });
+      console.log('[summary] invoicesRes', { data: invoicesRes.data, error: invoicesRes.error });
 
       if (appointmentsRes.error) throw appointmentsRes.error;
       if (invoicesRes.error) throw invoicesRes.error;
 
-      const appointments = (appointmentsRes.data ?? []) as PatientAppointment[];
-      const invoices = (invoicesRes.data ?? []) as PatientInvoice[];
-
-      console.debug('[usePatientSummary] context', {
-        clinicId,
-        patientId,
-        appointmentsCount: appointments.length,
-        appointmentsSample: appointments.slice(0, 3).map((a) => ({
-          id: a.id,
-          status: a.status,
-          start_time: a.start_time,
-        })),
-        invoicesCount: invoices.length,
-        invoicesSample: invoices.slice(0, 3).map((i) => ({
-          id: i.id,
-          total_amount: i.total_amount,
-          balance_due: i.balance_due,
-          status: i.status,
-        })),
-      });
+      const appointmentsRaw = appointmentsRes.data;
+      const invoicesRaw = invoicesRes.data;
+      const appointments = (
+        Array.isArray(appointmentsRaw)
+          ? appointmentsRaw
+          : appointmentsRaw != null
+            ? [appointmentsRaw]
+            : []
+      ) as PatientAppointment[];
+      const invoices = (
+        Array.isArray(invoicesRaw)
+          ? invoicesRaw
+          : invoicesRaw != null
+            ? [invoicesRaw]
+            : []
+      ) as PatientInvoice[];
 
       const invoiceIds = invoices.map((i) => i.id);
+      console.log('[summary] invoiceIds for payments fetch', invoiceIds);
 
       let payments: PatientPayment[] = [];
       if (invoiceIds.length > 0) {
         const { data: paymentsData, error: paymentsErr } = await db
           .from('payments')
-          .select('id, amount, payment_method, payment_date, notes, invoice_id')
+          .select('id, amount, payment_method, payment_date, invoice_id')
           .eq('clinic_id', clinicId!)
-          .in('invoice_id', invoiceIds)
-          .is('deleted_at', null);
+          .in('invoice_id', invoiceIds);
 
+        console.log('[summary] paymentsRes', { data: paymentsData, error: paymentsErr });
         if (paymentsErr) throw paymentsErr;
         payments = (paymentsData ?? []) as PatientPayment[];
       }
-
-      console.debug('[usePatientSummary] payments', {
-        clinicId,
-        patientId,
-        invoiceIds,
-        paymentsCount: payments.length,
-        paymentsSample: payments.slice(0, 5).map((p) => ({
-          id: p.id,
-          invoice_id: p.invoice_id,
-          amount: p.amount,
-        })),
-      });
 
       const visitCount = appointments.length;
       const completedVisitsCount = appointments.filter(
         (a) => a.status === 'COMPLETED'
       ).length;
       const totalInvoiced = invoices.reduce(
-        (sum, inv) => sum + inv.total_amount,
+        (sum, inv) => sum + Number(inv.total_amount ?? 0),
         0
       );
-      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+      const totalPaid = payments.reduce(
+        (sum, p) => sum + Number(p.amount ?? 0),
+        0
+      );
       const balanceDue = Math.max(totalInvoiced - totalPaid, 0);
 
       const paymentStatus: PatientSummary['paymentStatus'] =
@@ -253,7 +219,7 @@ export function usePatientSummary(patientId: string | null) {
       const latestAppointment =
         appointments.length > 0 ? appointments[0] : null;
 
-      const derived = {
+      const derived: PatientSummary = {
         visitCount,
         completedVisitsCount,
         totalInvoiced,
@@ -263,12 +229,7 @@ export function usePatientSummary(patientId: string | null) {
         latestAppointment,
       };
 
-      console.debug('[usePatientSummary] derived', {
-        clinicId,
-        patientId,
-        derived,
-      });
-
+      console.log('[summary] derived', derived);
       return derived;
     },
   });

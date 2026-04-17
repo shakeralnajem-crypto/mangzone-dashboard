@@ -20,6 +20,7 @@ import { exportToCsv } from '@/lib/exportCsv';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuthStore } from '@/store/authStore';
 import type { Database } from '@/types/supabase';
 
 type Patient = Database['public']['Tables']['patients']['Row'];
@@ -281,7 +282,12 @@ export function PatientsPage() {
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [detailPatient, setDetailPatient] = useState<Patient | null>(null);
 
+  const authLoading = useAuthStore((s) => s.isLoading);
   const { data: patients = [], isLoading, error } = usePatients(search);
+
+  // Show spinner while auth resolves OR while the first fetch is in flight.
+  // Previously placeholderData:[] masked isLoading — now we expose it correctly.
+  const showSpinner = authLoading || isLoading;
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const { pushAction } = useHistoryStore();
@@ -414,7 +420,7 @@ export function PatientsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {showSpinner ? (
         <div
           className="ds-card"
           style={{

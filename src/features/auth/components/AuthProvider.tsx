@@ -14,25 +14,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // SIGNED_IN is handled directly by LoginPage — ignore it here to avoid
-      // a race where this listener overwrites the store after LoginPage already
-      // navigated away.
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        return;
-      }
+      // SIGNED_IN is handled directly by LoginPage to avoid a race where this
+      // listener would overwrite the store after LoginPage already navigated.
+      if (event === 'SIGNED_IN') return;
 
-      // INITIAL_SESSION: app loaded with a persisted session (e.g. page refresh).
-      // Restore auth state from Supabase.
-      if (event === 'INITIAL_SESSION') {
+      // INITIAL_SESSION: page refresh with a persisted session.
+      // TOKEN_REFRESHED: JWT auto-renewed (~55 min). Re-hydrate profile so that
+      // clinicId stays valid in the store — without this, dormant tabs end up
+      // with clinicId = null and all data queries return empty.
+      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
         if (!session) {
           clearAuth();
+          return;
+        }
+        // Skip re-fetch on TOKEN_REFRESHED if profile is already loaded —
+        // avoids an unnecessary DB round-trip every hour.
+        if (event === 'TOKEN_REFRESHED' && useAuthStore.getState().profile) {
           return;
         }
         try {
           const profile = await authApi.getProfile(session.user.id);
           setAuth(session.user, profile);
         } catch (err) {
-          console.error('[auth] INITIAL_SESSION profile fetch failed:', err);
+          console.error(`[auth] ${event} profile fetch failed:`, err);
           await authApi.logout().catch(() => {});
           clearAuth();
         }

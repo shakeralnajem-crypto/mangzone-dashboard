@@ -34,9 +34,13 @@ export function usePatients(search = '') {
 
   return useQuery({
     queryKey: ['patients', clinicId ?? null, normalizedSearch],
-    enabled: !authLoading,
-    placeholderData: [],
+    // Both guards required:
+    // - !authLoading: prevents firing before session restore completes
+    // - !!clinicId:   prevents firing (and caching []) when profile is absent
+    enabled: !authLoading && !!clinicId,
     queryFn: async (): Promise<Patient[]> => {
+      // clinicId is guaranteed non-null here by the enabled guard above,
+      // but keep the check as a safety net for TypeScript narrowing.
       if (!clinicId) {
         return [];
       }

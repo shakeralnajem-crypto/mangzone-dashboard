@@ -64,7 +64,7 @@ export function useInvoices(filters?: { status?: string }) {
         .select(
           `
           *,
-          patient:patients(first_name, last_name, phone),
+          patient:patients(id, first_name, last_name, phone),
           doctor:profiles!invoices_doctor_id_fkey(full_name),
           payments(amount, payment_method, payment_date)
         `
@@ -79,6 +79,7 @@ export function useInvoices(filters?: { status?: string }) {
       if (error) throw error;
       return data as (Invoice & {
         patient: {
+          id: string;
           first_name: string;
           last_name: string;
           phone: string | null;

@@ -17,6 +17,7 @@ import {
   useDeleteAppointment,
 } from '@/hooks/useAppointments';
 import { PatientSearchInput } from '@/components/shared/PatientSearchInput';
+import { PatientDetailModal } from '@/components/shared/PatientDetailModal';
 import { useCreatePatient } from '@/hooks/usePatients';
 import { useDoctors } from '@/hooks/useStaff';
 import { useServices } from '@/hooks/useServices';
@@ -269,21 +270,45 @@ function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps) {
       startDtObj.getTime() + 30 * 60 * 1000
     ).toISOString();
 
-    const payload: Partial<AppointmentInsert> = {
-      patient_id: apptType === 'patient' ? form.patient_id || null : null,
-      walk_in_name:
-        apptType === 'walkin' ? form.walk_in_name.trim() || null : null,
-      walk_in_phone:
-        apptType === 'walkin' ? form.walk_in_phone.trim() || null : null,
-      doctor_ref_id: form.doctor_ref_id || null,
-      service_id: form.service_id || null,
-      start_time: startTime,
-      end_time: endTime,
-      status: form.status,
-      notes: form.notes.trim() || null,
-    };
+    // Auto-create a patient record from walk-in data (new appointments only).
+    // Split the walk_in_name into first + last. If only one word, last = '-'.
+    let resolvedPatientId: string | null =
+      apptType === 'patient' ? form.patient_id || null : null;
 
     try {
+      if (apptType === 'walkin' && !isEdit) {
+        const nameParts = form.walk_in_name.trim().split(/\s+/);
+        const firstName = nameParts[0] ?? form.walk_in_name.trim();
+        const lastName = nameParts.slice(1).join(' ') || '-';
+
+        const newPatient = await createPatient.mutateAsync({
+          first_name: firstName,
+          last_name: lastName,
+          phone: form.walk_in_phone.trim() || null,
+        } as { first_name: string; last_name: string; phone: string | null });
+
+        resolvedPatientId = newPatient.id;
+      }
+
+      const payload: Partial<AppointmentInsert> = {
+        // Link to the auto-created (or selected) patient
+        patient_id: resolvedPatientId,
+        // Keep walk_in fields on edit so existing data isn't lost;
+        // clear them on new appointments since patient record now exists.
+        walk_in_name: isEdit && apptType === 'walkin'
+          ? form.walk_in_name.trim() || null
+          : null,
+        walk_in_phone: isEdit && apptType === 'walkin'
+          ? form.walk_in_phone.trim() || null
+          : null,
+        doctor_ref_id: form.doctor_ref_id || null,
+        service_id: form.service_id || null,
+        start_time: startTime,
+        end_time: endTime,
+        status: form.status,
+        notes: form.notes.trim() || null,
+      };
+
       if (isEdit && appointment) {
         await update.mutateAsync({ id: appointment.id, values: payload });
       } else {
@@ -946,6 +971,7 @@ export function AppointmentsPage() {
       })
     | null
   >(null);
+  const [detailPatient, setDetailPatient] = useState<{ id: string; [key: string]: unknown } | null>(null);
 
   const [filterDate, setFilterDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
@@ -1277,17 +1303,23 @@ export function AppointmentsPage() {
                           {initials}
                         </div>
                         <div>
-                          <p
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: 'var(--txt)',
-                            }}
-                          >
-                            {a.patient
-                              ? `${a.patient.first_name} ${a.patient.last_name}`
-                              : (a.walk_in_name ?? '—')}
-                          </p>
+                          {a.patient ? (
+                            <button
+                              onClick={() => setDetailPatient(a.patient as typeof detailPatient)}
+                              style={{
+                                fontSize: 13, fontWeight: 600, color: 'var(--p2)',
+                                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                              }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = 'underline'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = 'none'}
+                            >
+                              {`${a.patient.first_name} ${a.patient.last_name}`}
+                            </button>
+                          ) : (
+                            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                              {a.walk_in_name ?? '—'}
+                            </p>
+                          )}
                           <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
                             {a.patient
                               ? isAr
@@ -1377,6 +1409,10 @@ export function AppointmentsPage() {
           onClose={closeModal}
         />
       )}
+      <PatientDetailModal
+        patient={detailPatient}
+        onClose={() => setDetailPatient(null)}
+      />
     </div>
   );
 }

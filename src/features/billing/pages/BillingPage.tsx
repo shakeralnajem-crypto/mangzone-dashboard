@@ -18,6 +18,7 @@ import {
   useUpdateInvoice,
 } from '@/hooks/useInvoices';
 import { PatientSearchInput } from '@/components/shared/PatientSearchInput';
+import { PatientDetailModal } from '@/components/shared/PatientDetailModal';
 import { formatEGP } from '@/lib/currency';
 import { exportToCsv } from '@/lib/exportCsv';
 import { useT, getStatusLabel } from '@/lib/translations';
@@ -27,6 +28,7 @@ type InvoiceInsert = Database['public']['Tables']['invoices']['Insert'];
 type Invoice = Database['public']['Tables']['invoices']['Row'];
 type InvoiceWithRelations = Invoice & {
   patient: {
+    id: string;
     first_name: string;
     last_name: string;
     phone: string | null;
@@ -625,6 +627,7 @@ export function BillingPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] =
     useState<InvoiceWithRelations | null>(null);
+  const [detailPatient, setDetailPatient] = useState<{ id: string; [key: string]: unknown } | null>(null);
   const { data: invoices = [], isLoading, error } = useInvoices();
   const { data: stats } = useBillingStats();
   const errorMessage =
@@ -832,34 +835,20 @@ export function BillingPage() {
                   </td>
                   <td className="ds-td">
                     {inv.patient ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <div
-                          className="ds-avatar"
-                          style={{
-                            width: 32,
-                            height: 32,
-                            fontSize: 11,
-                            flexShrink: 0,
-                          }}
-                        >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="ds-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
                           {inv.patient.first_name.charAt(0)}
                           {inv.patient.last_name.charAt(0)}
                         </div>
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: 'var(--txt)',
-                          }}
+                        <button
+                          onClick={() => setDetailPatient(inv.patient as typeof detailPatient)}
+                          style={{ fontSize: 13, fontWeight: 600, color: 'var(--p2)',
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = 'underline'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = 'none'}
                         >
                           {inv.patient.first_name} {inv.patient.last_name}
-                        </span>
+                        </button>
                       </div>
                     ) : (
                       <span style={{ color: 'var(--txt3)' }}>—</span>
@@ -939,6 +928,10 @@ export function BillingPage() {
           onClose={() => setEditingInvoice(null)}
         />
       )}
+      <PatientDetailModal
+        patient={detailPatient}
+        onClose={() => setDetailPatient(null)}
+      />
     </div>
   );
 }

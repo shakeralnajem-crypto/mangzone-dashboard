@@ -11,6 +11,7 @@ const db = supabase as any;
 
 type AppointmentWithRelations = Appointment & {
   patient: {
+    id: string;
     first_name: string;
     last_name: string;
     phone?: string | null;
@@ -48,7 +49,7 @@ export function useAppointments(filters?: {
         .select(
           `
           *,
-          patient:patients(first_name, last_name, phone),
+          patient:patients(id, first_name, last_name, phone),
           doctor:profiles!appointments_doctor_id_fkey(full_name),
           doctor_ref:doctors!appointments_doctor_ref_id_fkey(full_name),
           service:services(name)
@@ -84,7 +85,7 @@ export function useTodayAppointments() {
         .select(
           `
           *,
-          patient:patients(first_name, last_name),
+          patient:patients(id, first_name, last_name),
           doctor:profiles!appointments_doctor_id_fkey(full_name),
           doctor_ref:doctors!appointments_doctor_ref_id_fkey(full_name),
           service:services(name)
