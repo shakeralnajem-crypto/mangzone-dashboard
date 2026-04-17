@@ -319,7 +319,7 @@ export function AppLayout() {
 
         {/* Page content */}
         <main style={{ flex: 1, overflow: 'auto', position: 'relative', zIndex: 1 }}>
-          <div style={{ padding: '28px 28px' }}>
+          <div style={{ padding: 'clamp(16px, 3vw, 28px)' }}>
             <Outlet />
           </div>
         </main>

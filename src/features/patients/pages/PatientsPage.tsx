@@ -281,12 +281,21 @@ export function PatientsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [detailPatient, setDetailPatient] = useState<Patient | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const authLoading = useAuthStore((s) => s.isLoading);
   const { data: patients = [], isLoading, error } = usePatients(search);
 
+  // Reset to page 1 when search changes
+  const prevSearch = useState(search)[0];
+  if (prevSearch !== search && page !== 1) setPage(1);
+
+  // Paginate client-side (search is server-side via Supabase ILIKE)
+  const totalPages = Math.ceil(patients.length / PAGE_SIZE);
+  const paginatedPatients = patients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   // Show spinner while auth resolves OR while the first fetch is in flight.
-  // Previously placeholderData:[] masked isLoading — now we expose it correctly.
   const showSpinner = authLoading || isLoading;
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
@@ -491,7 +500,7 @@ export function PatientsPage() {
               </tr>
             </thead>
             <tbody>
-              {patients.map((p) => (
+              {paginatedPatients.map((p) => (
                 <tr key={p.id} className="ds-tbody-row">
                   <td className="ds-td">
                     <div
@@ -630,6 +639,55 @@ export function PatientsPage() {
               ))}
             </tbody>
           </table>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 20px', borderTop: '1px solid var(--brd)',
+              flexWrap: 'wrap', gap: 8,
+            }}>
+              <span style={{ fontSize: 12, color: 'var(--txt3)' }}>
+                {isAr
+                  ? `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, patients.length)} من ${patients.length}`
+                  : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, patients.length)} of ${patients.length}`}
+              </span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="ds-btn ds-btn-ghost"
+                  style={{ padding: '6px 12px', fontSize: 12, opacity: page === 1 ? 0.4 : 1 }}
+                >
+                  {isAr ? '← السابق' : '← Prev'}
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                  .map((p, i, arr) => (
+                    <>
+                      {i > 0 && arr[i - 1] !== p - 1 && (
+                        <span key={`dots-${p}`} style={{ padding: '6px 4px', color: 'var(--txt3)', fontSize: 12 }}>…</span>
+                      )}
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={p === page ? 'ds-btn ds-btn-primary' : 'ds-btn ds-btn-ghost'}
+                        style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
+                      >
+                        {p}
+                      </button>
+                    </>
+                  ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="ds-btn ds-btn-ghost"
+                  style={{ padding: '6px 12px', fontSize: 12, opacity: page === totalPages ? 0.4 : 1 }}
+                >
+                  {isAr ? 'التالي →' : 'Next →'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
