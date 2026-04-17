@@ -798,6 +798,7 @@ export function BillingPage() {
         </div>
       ) : (
         <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="ds-table-wrap">
           <table className="ds-table">
             <thead>
               <tr>
@@ -807,7 +808,7 @@ export function BillingPage() {
                   {t.total}
                 </th>
                 <th className="ds-th">{t.status}</th>
-                <th className="ds-th">{t.dueDate}</th>
+                <th className="ds-th mobile-hide">{t.dueDate}</th>
                 <th className="ds-th" style={{ textAlign: 'right' }}>
                   {t.actions}
                 </th>
@@ -880,7 +881,7 @@ export function BillingPage() {
                     </span>
                   </td>
                   <td
-                    className="ds-td"
+                    className="ds-td mobile-hide"
                     style={{ fontSize: 13, color: 'var(--txt2)' }}
                   >
                     {inv.due_date
@@ -911,6 +912,7 @@ export function BillingPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

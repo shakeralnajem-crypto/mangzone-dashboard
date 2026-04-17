@@ -1262,6 +1262,7 @@ export function AppointmentsPage() {
         </div>
       ) : (
         <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="ds-table-wrap">
           <table className="ds-table">
             <thead>
               <tr>
@@ -1269,7 +1270,7 @@ export function AppointmentsPage() {
                 <th className="ds-th">
                   {t.date} / {t.time}
                 </th>
-                <th className="ds-th">{t.service}</th>
+                <th className="ds-th mobile-hide">{t.service}</th>
                 <th className="ds-th">{t.status}</th>
                 <th className="ds-th" style={{ textAlign: 'right' }}>
                   {t.actions}
@@ -1284,32 +1285,15 @@ export function AppointmentsPage() {
                 return (
                   <tr key={a.id} className="ds-tbody-row">
                     <td className="ds-td">
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                        }}
-                      >
-                        <div
-                          className="ds-avatar"
-                          style={{
-                            width: 36,
-                            height: 36,
-                            fontSize: 12,
-                            flexShrink: 0,
-                          }}
-                        >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="ds-avatar" style={{ width: 36, height: 36, fontSize: 12, flexShrink: 0 }}>
                           {initials}
                         </div>
                         <div>
                           {a.patient ? (
                             <button
                               onClick={() => setDetailPatient(a.patient as typeof detailPatient)}
-                              style={{
-                                fontSize: 13, fontWeight: 600, color: 'var(--p2)',
-                                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                              }}
+                              style={{ fontSize: 13, fontWeight: 600, color: 'var(--p2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                               onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = 'underline'}
                               onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = 'none'}
                             >
@@ -1321,40 +1305,21 @@ export function AppointmentsPage() {
                             </p>
                           )}
                           <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
-                            {a.patient
-                              ? isAr
-                                ? 'مريض'
-                                : 'Patient'
-                              : isAr
-                                ? 'زيارة مباشرة'
-                                : 'Walk-in'}
+                            {a.patient ? (isAr ? 'مريض' : 'Patient') : (isAr ? 'زيارة مباشرة' : 'Walk-in')}
                             {a.walk_in_phone ? ` · ${a.walk_in_phone}` : ''}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="ds-td">
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: 'var(--txt)',
-                        }}
-                      >
-                        {new Date(a.start_time).toLocaleDateString('en-EG', {
-                          dateStyle: 'medium',
-                        })}
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                        {new Date(a.start_time).toLocaleDateString('en-EG', { dateStyle: 'medium' })}
                       </p>
                       <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
-                        {new Date(a.start_time).toLocaleTimeString('en-EG', {
-                          timeStyle: 'short',
-                        })}
+                        {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
                       </p>
                     </td>
-                    <td
-                      className="ds-td"
-                      style={{ color: 'var(--txt2)', fontSize: 13 }}
-                    >
+                    <td className="ds-td mobile-hide" style={{ color: 'var(--txt2)', fontSize: 13 }}>
                       {a.service?.name ?? '—'}
                     </td>
                     <td className="ds-td">
@@ -1366,14 +1331,7 @@ export function AppointmentsPage() {
                       />
                     </td>
                     <td className="ds-td">
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          gap: 4,
-                        }}
-                      >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                         <button
                           data-testid={`appointment-edit-${a.id}`}
                           onClick={() => openEdit(a)}
@@ -1399,6 +1357,7 @@ export function AppointmentsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
