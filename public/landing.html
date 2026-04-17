@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANGZONE — نظام إدارة العيادات</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#04040a;--p:#7c3aed;--pl:#a78bfa;--g:#10b981;--b:#3b82f6;--t:#f8fafc;--m:rgba(248,250,252,0.45);--card:rgba(255,255,255,0.04);--brd:rgba(255,255,255,0.08)}
+html{scroll-behavior:smooth}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--t);overflow-x:hidden;cursor:none}
+.cur{position:fixed;width:12px;height:12px;background:var(--pl);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:width .2s,height .2s;mix-blend-mode:difference}
+.cur-t{position:fixed;width:36px;height:36px;border:1px solid rgba(167,139,250,.35);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:all .14s ease}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 64px;display:flex;align-items:center;justify-content:space-between}
+.nb{position:absolute;inset:0;background:rgba(4,4,10,.75);backdrop-filter:blur(24px);border-bottom:1px solid var(--brd)}
+.logo{position:relative;z-index:1;display:flex;align-items:center;gap:12px;text-decoration:none}
+.lm{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;box-shadow:0 0 24px rgba(124,58,237,.5)}
+.lt{font-size:18px;font-weight:900;letter-spacing:1px}
+.np{position:relative;z-index:1;padding:10px 28px;border-radius:100px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;border:none;cursor:none;text-decoration:none;box-shadow:0 0 30px rgba(124,58,237,.4);transition:all .25s}
+.np:hover{box-shadow:0 0 50px rgba(124,58,237,.7);transform:translateY(-1px)}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:140px 24px 100px;position:relative;overflow:hidden}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(124,58,237,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.06) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 50%,black,transparent)}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none}
+.o1{width:600px;height:600px;background:rgba(124,58,237,.12);top:-150px;left:50%;transform:translateX(-50%);animation:drift 8s ease-in-out infinite}
+.o2{width:350px;height:350px;background:rgba(79,70,229,.1);bottom:50px;right:-80px;animation:drift 10s ease-in-out infinite reverse}
+.o3{width:280px;height:280px;background:rgba(16,185,129,.07);bottom:150px;left:-60px;animation:drift 12s ease-in-out infinite 2s}
+@keyframes drift{0%,100%{transform:translateY(0) translateX(-50%)}50%{transform:translateY(-30px) translateX(-50%)}}
+
+.badge{position:relative;z-index:2;display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:100px;border:1px solid rgba(124,58,237,.4);background:rgba(124,58,237,.1);font-size:13px;font-weight:600;color:var(--pl);margin-bottom:36px;animation:su .8s cubic-bezier(.16,1,.3,1) both}
+.bd{width:6px;height:6px;border-radius:50%;background:var(--g);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px var(--g)}50%{opacity:.3;box-shadow:none}}
+
+h1{position:relative;z-index:2;font-size:clamp(40px,8vw,92px);font-weight:900;line-height:1.05;letter-spacing:-2px;margin-bottom:28px;animation:su .8s .1s cubic-bezier(.16,1,.3,1) both}
+.gt{background:linear-gradient(135deg,#fff 0%,#a78bfa 50%,#818cf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.ot{-webkit-text-stroke:2px rgba(167,139,250,.4);-webkit-text-fill-color:transparent}
+
+.sub{position:relative;z-index:2;font-size:clamp(15px,2vw,20px);color:var(--m);line-height:1.8;max-width:580px;margin-bottom:52px;animation:su .8s .2s cubic-bezier(.16,1,.3,1) both}
+.acts{position:relative;z-index:2;display:flex;gap:16px;flex-wrap:wrap;justify-content:center;animation:su .8s .3s cubic-bezier(.16,1,.3,1) both}
+.bm{padding:18px 44px;border-radius:100px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-family:'Cairo',sans-serif;font-size:17px;font-weight:800;border:none;cursor:none;text-decoration:none;box-shadow:0 0 40px rgba(124,58,237,.4);transition:all .3s;position:relative;overflow:hidden}
+.bm::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);opacity:0;transition:opacity .3s}
+.bm:hover::before{opacity:1}
+.bm:hover{box-shadow:0 0 70px rgba(124,58,237,.7),0 20px 40px rgba(124,58,237,.3);transform:translateY(-3px)}
+.bo{padding:18px 44px;border-radius:100px;background:transparent;color:var(--t);font-family:'Cairo',sans-serif;font-size:17px;font-weight:700;border:1px solid var(--brd);cursor:none;text-decoration:none;transition:all .3s}
+.bo:hover{border-color:rgba(124,58,237,.5);background:rgba(124,58,237,.08);transform:translateY(-3px)}
+@keyframes su{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+
+/* MOCKUP */
+.mock{position:relative;z-index:2;margin-top:80px;width:100%;max-width:980px;animation:su .8s .5s cubic-bezier(.16,1,.3,1) both}
+.mock-glow{position:absolute;inset:-60px;background:radial-gradient(ellipse at center,rgba(124,58,237,.18),transparent 65%);pointer-events:none;z-index:-1}
+.shell{background:rgba(255,255,255,.04);border:1px solid var(--brd);border-radius:24px;overflow:hidden;box-shadow:0 60px 120px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.04) inset}
+.bar{background:rgba(255,255,255,.03);padding:14px 20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--brd)}
+.d{width:10px;height:10px;border-radius:50%}
+.dr{background:#ff5f57}.dy{background:#febc2e}.dg{background:#28c840}
+.url{flex:1;text-align:center;font-size:11px;color:rgba(255,255,255,.22)}
+.body{padding:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.dc{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px;transition:all .3s}
+.dc:hover{background:rgba(255,255,255,.07);border-color:rgba(124,58,237,.3);transform:translateY(-2px)}
+.dl{font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.dv{font-size:26px;font-weight:900;color:#fff}
+.dv.vg{color:#4ade80}.dv.vp{color:#a78bfa}.dv.vb{color:#60a5fa}
+.ds{font-size:10px;color:rgba(255,255,255,.25);margin-top:4px}
+.df{grid-column:span 4}
+.sr{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.sr:last-child{border:none}
+.st{font-size:11px;color:rgba(255,255,255,.35);width:42px;flex-shrink:0;direction:ltr}
+.sa{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+.sn{flex:1}
+.nn{font-size:12px;font-weight:700;color:rgba(255,255,255,.85)}
+.ns{font-size:10px;color:rgba(255,255,255,.3)}
+.sb{font-size:10px;font-weight:700;padding:4px 10px;border-radius:100px;white-space:nowrap}
+
+/* FEATURES */
+.fs{padding:140px 64px;max-width:1200px;margin:0 auto}
+.ey{font-size:11px;font-weight:700;letter-spacing:3px;color:var(--pl);text-transform:uppercase;margin-bottom:16px}
+.sh{font-size:clamp(32px,5vw,56px);font-weight:900;line-height:1.1;letter-spacing:-1.5px;margin-bottom:80px}
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--brd);border:1px solid var(--brd);border-radius:24px;overflow:hidden}
+.fc{background:var(--bg);padding:40px;transition:all .3s;position:relative;overflow:hidden}
+.fc::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,58,237,.06),transparent);opacity:0;transition:opacity .3s}
+.fc:hover::after{opacity:1}
+.fc:hover{background:rgba(124,58,237,.04)}
+.fn{font-size:52px;font-weight:900;background:linear-gradient(135deg,rgba(124,58,237,.5),rgba(124,58,237,.15));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:24px}
+.ft{font-size:20px;font-weight:800;margin-bottom:12px}
+.fd{font-size:14px;color:var(--m);line-height:1.7}
+
+/* PROOF */
+.proof{padding:60px 64px;border-top:1px solid var(--brd);border-bottom:1px solid var(--brd)}
+.pi{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--brd);border:1px solid var(--brd);border-radius:20px;overflow:hidden}
+.pk{background:var(--bg);padding:48px 32px;text-align:center}
+.pn{font-size:56px;font-weight:900;letter-spacing:-2px;background:linear-gradient(135deg,#7c3aed,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.pl{font-size:14px;color:var(--m);margin-top:8px;font-weight:500}
+
+/* ROLES */
+.rs{padding:140px 64px;max-width:1200px;margin:0 auto}
+.rg{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.rc{padding:32px;border-radius:20px;background:var(--card);border:1px solid var(--brd);display:flex;align-items:flex-start;gap:20px;transition:all .3s}
+.rc:hover{border-color:rgba(124,58,237,.4);background:rgba(124,58,237,.05);transform:translateX(-4px)}
+.ri{width:52px;height:52px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px}
+.rt{font-size:16px;font-weight:800;margin-bottom:8px}
+.rd{font-size:13px;color:var(--m);line-height:1.6}
+
+/* CTA */
+.cw{padding:160px 64px;text-align:center;position:relative;overflow:hidden}
+.co{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.12),transparent 60%);pointer-events:none}
+.cr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(124,58,237,.15);animation:rp 3s ease-in-out infinite}
+.cr1{width:420px;height:420px}
+.cr2{width:640px;height:640px;animation-delay:1s}
+.cr3{width:860px;height:860px;animation-delay:2s;border-color:rgba(124,58,237,.05)}
+@keyframes rp{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:1}50%{transform:translate(-50%,-50%) scale(1.04);opacity:.4}}
+.ch{position:relative;z-index:1;font-size:clamp(44px,9vw,108px);font-weight:900;line-height:1;letter-spacing:-3px;margin-bottom:32px}
+.cs{position:relative;z-index:1;font-size:18px;color:var(--m);margin-bottom:52px}
+
+footer{padding:40px 64px;border-top:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between}
+.fc2{font-size:13px;color:rgba(255,255,255,.2)}
+
+.rev{opacity:0;transform:translateY(40px);transition:all .8s cubic-bezier(.16,1,.3,1)}
+.rev.vis{opacity:1;transform:translateY(0)}
+
+@media(max-width:768px){
+  nav{padding:16px 20px}
+  .fs,.rs,.cw,.proof{padding:80px 20px}
+  .fg{grid-template-columns:1fr}
+  .pi{grid-template-columns:repeat(2,1fr)}
+  .rg{grid-template-columns:1fr}
+  .body{grid-template-columns:1fr 1fr}
+  .df{grid-column:span 2}
+  .dc:nth-child(n+3):not(.df){display:none}
+  h1{letter-spacing:-1px}
+  .ch{letter-spacing:-1px}
+  footer{padding:30px 20px;flex-direction:column;gap:12px;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div class="cur" id="cur"></div>
+<div class="cur-t" id="curt"></div>
+
+<nav>
+  <div class="nb"></div>
+  <a href="#" class="logo">
+    <div class="lm">MZ</div>
+    <span class="lt">MANGZONE</span>
+  </a>
+  <a href="https://mangzone.netlify.app" target="_blank" class="np">جرّب الديمو ←</a>
+</nav>
+
+<section class="hero">
+  <div class="grid"></div>
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+
+  <div class="badge"><span class="bd"></span>النظام جاهز للاستخدام الآن</div>
+
+  <h1>
+    <span class="gt">إدارة عيادتك</span><br>
+    <span class="ot">بذكاء حقيقي</span>
+  </h1>
+
+  <p class="sub">نظام يربط المواعيد، الفواتير، والدفع في مكان واحد.<br>من استقبال المريض حتى استلام الدفعة — كل شيء تحت السيطرة.</p>
+
+  <div class="acts">
+    <a href="https://mangzone.netlify.app" target="_blank" class="bm">🚀 جرّب الديمو الآن</a>
+    <a href="#feat" class="bo">اكتشف المميزات</a>
+  </div>
+
+  <div class="mock">
+    <div class="mock-glow"></div>
+    <div class="shell">
+      <div class="bar">
+        <div class="d dr"></div><div class="d dy"></div><div class="d dg"></div>
+        <div class="url">mangzone.netlify.app/dashboard</div>
+      </div>
+      <div class="body">
+        <div class="dc"><div class="dl">إجمالي المرضى</div><div class="dv vp">21</div><div class="ds">مسجّل</div></div>
+        <div class="dc"><div class="dl">مواعيد اليوم</div><div class="dv">6</div><div class="ds">مجدوَلة</div></div>
+        <div class="dc"><div class="dl">إيرادات الشهر</div><div class="dv vg">1,500</div><div class="ds">جنيه مصري</div></div>
+        <div class="dc"><div class="dl">فواتير معلقة</div><div class="dv vb">3</div><div class="ds">تحتاج متابعة</div></div>
+        <div class="dc df">
+          <div class="dl" style="margin-bottom:14px">جدول اليوم</div>
+          <div class="sr">
+            <div class="st">13:00</div>
+            <div class="sa" style="background:rgba(74,222,128,.15);color:#4ade80">AM</div>
+            <div class="sn"><div class="nn">Ahmed Mohammed</div><div class="ns">Teeth Cleaning</div></div>
+            <div class="sb" style="background:rgba(74,222,128,.15);color:#4ade80">Arrived ✓</div>
+          </div>
+          <div class="sr">
+            <div class="st">15:30</div>
+            <div class="sa" style="background:rgba(167,139,250,.15);color:#a78bfa">KA</div>
+            <div class="sn"><div class="nn">Khaled Abdullah</div><div class="ns">Zirconia Crown</div></div>
+            <div class="sb" style="background:rgba(167,139,250,.15);color:#a78bfa">Scheduled</div>
+          </div>
+          <div class="sr">
+            <div class="st">19:30</div>
+            <div class="sa" style="background:rgba(96,165,250,.15);color:#60a5fa">DM</div>
+            <div class="sn"><div class="nn">Dina Mostafa</div><div class="ns">Root Canal</div></div>
+            <div class="sb" style="background:rgba(96,165,250,.15);color:#60a5fa">Scheduled</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="fs rev" id="feat">
+  <div class="ey">المميزات</div>
+  <h2 class="sh">كل ما تحتاجه<br><span class="gt">في نظام واحد</span></h2>
+  <div class="fg">
+    <div class="fc"><div class="fn">01</div><div class="ft">تتبّع المرضى بسهولة</div><div class="fd">ملف طبي كامل — تاريخ الزيارات، العلاجات، الفواتير، والتنبيهات الطبية. كل شيء بضغطة واحدة.</div></div>
+    <div class="fc"><div class="fn">02</div><div class="ft">إدارة المواعيد بدون تعقيد</div><div class="fd">جدول يومي واضح، حجز سريع، ومتابعة حالة كل موعد لحظة بلحظة. لا فوضى، لا تعارض.</div></div>
+    <div class="fc"><div class="fn">03</div><div class="ft">تقارير مالية دقيقة</div><div class="fd">إيرادات، مصروفات، فواتير معلقة، وتحليل شهري كامل. كل الأرقام واضحة ودقيقة.</div></div>
+    <div class="fc"><div class="fn">04</div><div class="ft">مساعد ذكي بالعربي</div><div class="fd">اسأل بالعربي عن أي شيء في العيادة. مدعوم بـ Gemini AI — مجاناً ويرد فوراً.</div></div>
+    <div class="fc"><div class="fn">05</div><div class="ft">صلاحيات متعددة وآمنة</div><div class="fd">ADMIN، طبيب، استقبال، محاسب — كل دور له صلاحياته الخاصة. أمان تام بـ Supabase RLS.</div></div>
+    <div class="fc"><div class="fn">06</div><div class="ft">يعمل من أي جهاز</div><div class="fd">جوال، تابلت، أو كمبيوتر. في المتصفح مباشرة بدون تثبيت. في أي مكان وأي وقت.</div></div>
+  </div>
+</section>
+
+<div class="proof rev">
+  <div class="pi">
+    <div class="pk"><div class="pn">21+</div><div class="pl">مريض مسجّل</div></div>
+    <div class="pk"><div class="pn">6</div><div class="pl">أدوار مختلفة</div></div>
+    <div class="pk"><div class="pn">100%</div><div class="pl">آمن ومحمي</div></div>
+    <div class="pk"><div class="pn">∞</div><div class="pl">قابل للتوسع</div></div>
+  </div>
+</div>
+
+<section class="rs rev">
+  <div class="ey">الأدوار</div>
+  <h2 class="sh">نظام مصمم<br><span class="gt">لكل الفريق</span></h2>
+  <div class="rg">
+    <div class="rc"><div class="ri" style="background:rgba(124,58,237,.15)">👑</div><div><div class="rt">المدير — ADMIN</div><div class="rd">تحكم كامل في كل شيء. المرضى، الفريق، التقارير المالية، والإعدادات.</div></div></div>
+    <div class="rc"><div class="ri" style="background:rgba(16,185,129,.15)">🦷</div><div><div class="rt">الطبيب</div><div class="rd">يرى مواعيده ومرضاه فقط. ملفات طبية كاملة وخطط علاج منظّمة.</div></div></div>
+    <div class="rc"><div class="ri" style="background:rgba(59,130,246,.15)">📋</div><div><div class="rt">الاستقبال</div><div class="rd">حجز مواعيد، استقبال مرضى جدد، ومتابعة الجدول اليومي بسهولة تامة.</div></div></div>
+    <div class="rc"><div class="ri" style="background:rgba(251,191,36,.15)">💰</div><div><div class="rt">المحاسب</div><div class="rd">فواتير، دفعات، مصروفات، وتقارير مالية شاملة. بدون الوصول للملفات الطبية.</div></div></div>
+  </div>
+</section>
+
+<section class="cw rev">
+  <div class="co"></div>
+  <div class="cr cr1"></div>
+  <div class="cr cr2"></div>
+  <div class="cr cr3"></div>
+  <h2 class="ch"><span class="gt">جرّب</span><br>الديمو<br><span class="ot">الآن</span></h2>
+  <p class="cs">ادخل وجرّب كل المميزات — بدون أي التزام</p>
+  <div style="position:relative;z-index:1">
+    <a href="https://mangzone.netlify.app" target="_blank" class="bm" style="font-size:20px;padding:22px 56px">🚀 ابدأ الآن مجاناً</a>
+  </div>
+</section>
+
+<footer>
+  <div class="logo">
+    <div class="lm" style="width:28px;height:28px;font-size:11px">MZ</div>
+    <span class="lt" style="font-size:16px">MANGZONE</span>
+  </div>
+  <div class="fc2">نظام إدارة عيادات — صُنع بـ ❤️ في مصر</div>
+</footer>
+
+<script>
+const cur=document.getElementById('cur'),curt=document.getElementById('curt');
+let mx=0,my=0,tx=0,ty=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  cur.style.left=mx+'px';cur.style.top=my+'px';
+});
+(function anim(){
+  tx+=(mx-tx)*.12;ty+=(my-ty)*.12;
+  curt.style.left=tx+'px';curt.style.top=ty+'px';
+  requestAnimationFrame(anim);
+})();
+document.querySelectorAll('a,button').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cur.style.width='20px';cur.style.height='20px'});
+  el.addEventListener('mouseleave',()=>{cur.style.width='12px';cur.style.height='12px'});
+});
+const obs=new IntersectionObserver(e=>e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('vis')}),{threshold:.1});
+document.querySelectorAll('.rev').forEach(el=>obs.observe(el));
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t)t.scrollIntoView({behavior:'smooth'});
+  });
+});
+</script>
+</body>
+</html>
