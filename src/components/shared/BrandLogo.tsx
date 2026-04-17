@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 interface BrandLogoProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'default' | 'white';
   showText?: boolean;
   className?: string;
@@ -10,7 +10,8 @@ interface BrandLogoProps {
 const sizes = {
   sm: { height: 36 },
   md: { height: 48 },
-  lg: { height: 64 },
+  lg: { height: 80 },
+  xl: { height: 120 },
 };
 
 export function BrandLogo({

@@ -173,7 +173,7 @@ export function LoginPage() {
         <div className="w-full max-w-sm animate-fade-in">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
-            <BrandLogo size="md" />
+            <BrandLogo size="xl" />
           </div>
 
           {/* Heading */}
