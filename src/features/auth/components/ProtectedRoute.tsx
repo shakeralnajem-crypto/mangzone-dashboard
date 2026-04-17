@@ -5,16 +5,12 @@ import { canAccessPage } from "@/lib/permissions";
 export function ProtectedRoute() {
   const { isAuthenticated, isLoading, profile } = useAuthStore();
   const location = useLocation();
-
   if (isLoading) {
     return (
-      <div style={{display:"flex",height:"100vh",alignItems:"center",justifyContent:"center",background:"#0D1117",flexDirection:"column",gap:16}}>
-        <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(.95)}}`}</style>
-        <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:900,color:"white",animation:"pulse 1.5s ease-in-out infinite"}}>MZ</div>
-        <p style={{fontSize:13,color:"rgba(255,25        <p style={{fontSize:13,color:"rgba(255,25        <p sحميل...</p>
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600" />
       </div>
     );
   }
-
   return <Outlet />;
 }
