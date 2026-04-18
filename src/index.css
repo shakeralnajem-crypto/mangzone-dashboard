@@ -558,15 +558,7 @@ textarea.ds-input { resize: vertical; min-height: 80px; }
 }
 
 /* ── Mobile Responsive Utilities ─────────────────────────────── */
-.hidden { display: none !important; }
-.lg\:flex { display: none; }
-.lg\:hidden { display: flex; }
-
-@media (min-width: 1024px) {
-  .lg\:flex { display: flex !important; }
-  .lg\:hidden { display: none !important; }
-  .hidden { display: none !important; }
-}
+/* Mobile Responsive Utilities — handled by Tailwind lg: prefix */
 
 /* Mobile-first table */
 .ds-table-wrap {
@@ -632,4 +624,14 @@ textarea.ds-input { resize: vertical; min-height: 80px; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Dashboard responsive grid */
+@media (max-width: 768px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
