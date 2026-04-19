@@ -61,6 +61,7 @@ function PatientModal({
   );
   const [submitError, setSubmitError] = useState('');
 
+  const { data: patients = [] } = usePatients();
   const create = useCreatePatient();
   const update = useUpdatePatient();
   const isPending = create.isPending || update.isPending;
@@ -87,6 +88,18 @@ function PatientModal({
       if (digits.length < 10 || digits.length > 15) {
         setSubmitError(
           isAr ? 'رقم الهاتف غير صحيح.' : 'Phone number looks invalid.'
+        );
+        return;
+      }
+      const normalizedPhone = digits;
+      const duplicate = patients.find(
+        (p) => p.phone?.replace(/\D/g, '') === normalizedPhone && p.id !== patient?.id
+      );
+      if (duplicate) {
+        setSubmitError(
+          isAr
+            ? `رقم الهاتف هذا مسجّل بالفعل للمريض: ${duplicate.first_name} ${duplicate.last_name}`
+            : `This phone is already registered to: ${duplicate.first_name} ${duplicate.last_name}`
         );
         return;
       }
