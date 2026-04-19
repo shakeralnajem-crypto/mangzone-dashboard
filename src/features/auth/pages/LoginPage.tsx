@@ -55,6 +55,18 @@ export function LoginPage() {
             : String(err);
 
       if (
+        message.includes('Failed to fetch') ||
+        message.includes('NetworkError') ||
+        message.includes('ERR_INTERNET_DISCONNECTED') ||
+        message.includes('ERR_NAME_NOT_RESOLVED') ||
+        !navigator.onLine
+      ) {
+        setError(
+          isRtl
+            ? 'لا يوجد اتصال بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.'
+            : 'No internet connection. Please check your network and try again.'
+        );
+      } else if (
         message.includes('Invalid login credentials') ||
         message.includes('invalid_grant')
       ) {

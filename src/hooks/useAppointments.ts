@@ -57,7 +57,8 @@ export function useAppointments(filters?: {
         )
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
-        .order('start_time', { ascending: false });
+        .order('start_time', { ascending: false })
+        .limit(1000);
 
       if (filters?.doctorId) q = q.eq('doctor_ref_id', filters.doctorId);
       if (filters?.status) q = q.eq('status', filters.status);

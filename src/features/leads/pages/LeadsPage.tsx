@@ -7,6 +7,7 @@ import { useT, getStatusLabel } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { Database } from '@/types/supabase';
+import { BRAND } from '@/config/brand';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 
@@ -163,7 +164,7 @@ export function LeadsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
 
-  const clinicName = 'MangZone';
+  const clinicName = BRAND.name;
 
   const { data: leads = [], isLoading, error } = useLeads({
     search: search || undefined,

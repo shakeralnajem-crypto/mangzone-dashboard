@@ -12,40 +12,55 @@ interface Message {
 
 function renderContent(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i}>{part.slice(2, -2)}</strong>;
     }
+
     if (part.includes('\n')) {
       return (
         <span key={i}>
           {part.split('\n').map((line, j, arr) => (
-            <span key={j}>{line}{j < arr.length - 1 && <br />}</span>
+            <span key={j}>
+              {line}
+              {j < arr.length - 1 && <br />}
+            </span>
           ))}
         </span>
       );
     }
+
     return <span key={i}>{part}</span>;
   });
 }
 
 const WELCOME_MSG = (isAr: boolean) =>
   isAr
-    ? "مرحباً! أنا مساعد MANGZONE. اسألني عن المرضى، المواعيد، الإيرادات، أو أي إحصائيات."
-    : "Hello! I\'m your MANGZONE assistant. Ask me about patients, appointments, revenue, or any clinic stats.";
+    ? 'مرحباً! أنا مساعد MANGZONE. اسألني عن المرضى، المواعيد، الإيرادات، أو أي إحصائيات.'
+    : "Hello! I'm your MANGZONE assistant. Ask me about patients, appointments, revenue, or any clinic stats.";
 
 const SUGGESTIONS_EN = [
-  "How many patients do we have?",
-  "What\'s today\'s appointment count?",
-  "Show me unpaid invoices count",
-  "What\'s this month\'s revenue?",
+  'How many patients do we have?',
+  "What's today's appointment count?",
+  'Show me unpaid invoices count',
+  "What's this month's revenue?",
 ];
+
 const SUGGESTIONS_AR = [
-  "كم عدد المرضى؟",
-  "كم عدد مواعيد اليوم؟",
-  "أظهر لي الفواتير غير المدفوعة",
-  "ما هي إيرادات هذا الشهر؟",
+  'كم عدد المرضى؟',
+  'كم عدد مواعيد اليوم؟',
+  'أظهر لي الفواتير غير المدفوعة',
+  'ما هي إيرادات هذا الشهر؟',
 ];
+
+function makeMessage(role: 'user' | 'assistant', content: string): Message {
+  return {
+    id: crypto.randomUUID(),
+    role,
+    content,
+  };
+}
 
 export function AiChat() {
   const { i18n } = useTranslation();
@@ -54,111 +69,190 @@ export function AiChat() {
   const { profile } = useAuthStore();
   const { data: stats } = useDashboardStats();
 
-  // Reset messages when user changes
   const userId = profile?.id ?? null;
-  const [lastUserId, setLastUserId] = useState<string | null>(null);
-
-  const makeWelcome = (ar: boolean): Message => ({
-    id: '0',
-    role: 'assistant',
-    content: WELCOME_MSG(ar),
-  });
+  const lastUserIdRef = useRef<string | null>(null);
 
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([makeWelcome(isAr)]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: WELCOME_MSG(isAr),
+    },
+  ]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Clear chat when user changes (login/logout/switch)
   useEffect(() => {
-    if (userId !== lastUserId) {
-      setLastUserId(userId);
-      setMessages([makeWelcome(isAr)]);
+    if (userId !== lastUserIdRef.current) {
+      lastUserIdRef.current = userId;
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: WELCOME_MSG(isAr),
+        },
+      ]);
       setOpen(false);
+      setInput('');
+      setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, isAr]);
 
-  // Update welcome message when language changes
   useEffect(() => {
-    setMessages(prev => {
-      if (prev.length === 1 && prev[0].id === '0') {
-        return [makeWelcome(isAr)];
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0]?.id === 'welcome') {
+        return [
+          {
+            id: 'welcome',
+            role: 'assistant',
+            content: WELCOME_MSG(isAr),
+          },
+        ];
       }
       return prev;
     });
   }, [isAr]);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 100);
+    if (!open) return;
+
+    const timer = window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const buildSystemPrompt = () => {
-    const egp = stats ? new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue) : 'N/A';
-    const lang = isAr ? 'Arabic' : 'English';
+    const egp = stats
+      ? new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue)
+      : 'N/A';
+
     return `You are a helpful AI assistant for MANGZONE, a dental clinic management system in Egypt.
 You assist clinic staff with clinic operations, patient management, appointments, billing, and dental practice questions.
 
-IMPORTANT: Always respond in ${lang}. If the user writes in Arabic, respond in Arabic. If in English, respond in English.
+Respond in the same language as the user's latest message.
+If the user's language is unclear, default to ${isAr ? 'Arabic' : 'English'}.
 
 Current clinic stats:
 - Total patients: ${stats?.totalPatients ?? 'unknown'}
-- Today\'s appointments: ${stats?.todayAppointments ?? 'unknown'}
+- Today's appointments: ${stats?.todayAppointments ?? 'unknown'}
 - Cancelled today: ${stats?.cancelledToday ?? 'unknown'}
 - Unpaid invoices: ${stats?.unpaidInvoices ?? 'unknown'}
 - New leads: ${stats?.newLeads ?? 'unknown'}
 - Monthly revenue: ${egp} EGP
 
-Logged-in user: ${profile?.full_name ?? 'Unknown'} (${profile?.role ?? 'Unknown'})
+Logged-in user:
+- Name: ${profile?.full_name ?? 'Unknown'}
+- Role: ${profile?.role ?? 'Unknown'}
 
-Respond concisely and helpfully. Use EGP for currency. Keep responses focused on dental clinic operations.`;
+Rules:
+- Be concise and helpful
+- Use EGP for currency
+- Stay focused on dental clinic operations
+- If exact data is unavailable, say so clearly
+- Do not invent numbers not present in the provided stats`;
   };
 
   const getFallbackReply = (q: string): string => {
-    const lower = q.toLowerCase();
-    if (!stats) return isAr ? "لا تتوفر إحصائيات حالياً." : "No stats available right now.";
+    const normalized = q.trim().toLowerCase();
+
+    if (!stats) {
+      return isAr
+        ? 'لا تتوفر إحصائيات حالياً.'
+        : 'No stats available right now.';
+    }
 
     const egp = new Intl.NumberFormat('en-EG').format(stats.monthlyRevenue);
 
-    if (lower.includes('patient') || lower.includes('مريض') || lower.includes('مرضى'))
-      return isAr ? `عدد المرضى النشطين: **${stats.totalPatients}** مريض.` : `The clinic has **${stats.totalPatients}** active patients.`;
+    if (
+      normalized.includes('patient') ||
+      normalized.includes('مريض') ||
+      normalized.includes('مرضى')
+    ) {
+      return isAr
+        ? `عدد المرضى النشطين: **${stats.totalPatients}** مريض.`
+        : `The clinic has **${stats.totalPatients}** active patients.`;
+    }
 
-    if (lower.includes('appointment') || lower.includes('موعد') || lower.includes('مواعيد'))
+    if (
+      normalized.includes('appointment') ||
+      normalized.includes('appts') ||
+      normalized.includes('موعد') ||
+      normalized.includes('مواعيد')
+    ) {
       return isAr
         ? `مواعيد اليوم: **${stats.todayAppointments}**، منها **${stats.cancelledToday}** ملغي.`
         : `There are **${stats.todayAppointments}** appointments today, with **${stats.cancelledToday}** cancelled.`;
+    }
 
-    if (lower.includes('invoice') || lower.includes('unpaid') || lower.includes('فاتورة') || lower.includes('مدفوع'))
-      return isAr ? `عدد الفواتير غير المدفوعة: **${stats.unpaidInvoices}**.` : `There are **${stats.unpaidInvoices}** unpaid/partially paid invoices.`;
-
-    if (lower.includes('revenue') || lower.includes('income') || lower.includes('إيراد') || lower.includes('دخل'))
-      return isAr ? `إيرادات الشهر: **${egp} جنيه**.` : `This month\'s revenue is **${egp} EGP**.`;
-
-    if (lower.includes('lead') || lower.includes('عميل'))
-      return isAr ? `عدد العملاء المحتملين الجدد: **${stats.newLeads}**.` : `There are **${stats.newLeads}** new leads awaiting follow-up.`;
-
-    if (lower.includes('summary') || lower.includes('overview') || lower.includes('ملخص'))
+    if (
+      normalized.includes('invoice') ||
+      normalized.includes('unpaid') ||
+      normalized.includes('فاتورة') ||
+      normalized.includes('فواتير') ||
+      normalized.includes('مدفوع') ||
+      normalized.includes('غير مدفوعة')
+    ) {
       return isAr
-        ? `**ملخص العيادة**\n\n• المرضى: **${stats.totalPatients}**\n• مواعيد اليوم: **${stats.todayAppointments}**\n• فواتير معلقة: **${stats.unpaidInvoices}**\n• عملاء جدد: **${stats.newLeads}**\n• إيرادات الشهر: **${egp} جنيه**`
-        : `**Clinic Summary**\n\n• Patients: **${stats.totalPatients}**\n• Today\'s appts: **${stats.todayAppointments}**\n• Unpaid invoices: **${stats.unpaidInvoices}**\n• New leads: **${stats.newLeads}**\n• Monthly revenue: **${egp} EGP**`;
+        ? `عدد الفواتير غير المدفوعة أو الجزئية: **${stats.unpaidInvoices}**.`
+        : `There are **${stats.unpaidInvoices}** unpaid or partially paid invoices.`;
+    }
+
+    if (
+      normalized.includes('revenue') ||
+      normalized.includes('income') ||
+      normalized.includes('إيراد') ||
+      normalized.includes('إيرادات') ||
+      normalized.includes('دخل')
+    ) {
+      return isAr
+        ? `إيرادات هذا الشهر: **${egp} جنيه**.`
+        : `This month's revenue is **${egp} EGP**.`;
+    }
+
+    if (
+      normalized.includes('lead') ||
+      normalized.includes('عميل') ||
+      normalized.includes('عملاء') ||
+      normalized.includes('leads')
+    ) {
+      return isAr
+        ? `عدد العملاء المحتملين الجدد: **${stats.newLeads}**.`
+        : `There are **${stats.newLeads}** new leads awaiting follow-up.`;
+    }
+
+    if (
+      normalized.includes('summary') ||
+      normalized.includes('overview') ||
+      normalized.includes('ملخص')
+    ) {
+      return isAr
+        ? `**ملخص العيادة**\n\n• المرضى: **${stats.totalPatients}**\n• مواعيد اليوم: **${stats.todayAppointments}**\n• الفواتير غير المدفوعة: **${stats.unpaidInvoices}**\n• العملاء الجدد: **${stats.newLeads}**\n• إيرادات الشهر: **${egp} جنيه**`
+        : `**Clinic Summary**\n\n• Patients: **${stats.totalPatients}**\n• Today's appointments: **${stats.todayAppointments}**\n• Unpaid invoices: **${stats.unpaidInvoices}**\n• New leads: **${stats.newLeads}**\n• Monthly revenue: **${egp} EGP**`;
+    }
 
     return isAr
-      ? "يمكنني مساعدتك في عدد المرضى، المواعيد، الإيرادات، والفواتير. جرب أحد الاقتراحات."
-      : "I can help with patient counts, appointments, revenue, and invoices. Try asking one of the suggestions above.";
+      ? 'يمكنني مساعدتك في عدد المرضى، المواعيد، الإيرادات، والفواتير. جرّب أحد الاقتراحات.'
+      : 'I can help with patient counts, appointments, revenue, and invoices. Try one of the suggestions.';
   };
 
   const handleSend = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || isLoading) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content };
-    setMessages(prev => [...prev, userMsg]);
+    const currentMessages = [...messages];
+    const userMsg = makeMessage('user', content);
+
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
@@ -166,75 +260,115 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
 
     if (!geminiKey) {
       const reply = getFallbackReply(content);
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
+      setMessages((prev) => [...prev, makeMessage('assistant', reply)]);
       setIsLoading(false);
       return;
     }
 
     try {
       const systemPrompt = buildSystemPrompt();
-      const historyParts = messages
-        .filter(m => m.id !== '0')
-        .map(m => ({
+
+      const historyParts = currentMessages
+        .filter((m) => m.id !== 'welcome')
+        .map((m) => ({
           role: m.role === 'user' ? 'user' : 'model',
           parts: [{ text: m.content }],
         }));
-      historyParts.push({ role: 'user', parts: [{ text: content }] });
+
+      historyParts.push({
+        role: 'user',
+        parts: [{ text: content }],
+      });
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
+            system_instruction: {
+              parts: [{ text: systemPrompt }],
+            },
             contents: historyParts,
-            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+            generationConfig: {
+              maxOutputTokens: 512,
+              temperature: 0.7,
+            },
           }),
         }
       );
 
-      if (!res.ok) throw new Error(`Gemini API error ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`Gemini API error ${res.status}`);
+      }
 
-      const data = await res.json() as {
-        candidates: { content: { parts: { text: string }[] } }[];
+      const data = (await res.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{
+              text?: string;
+            }>;
+          };
+        }>;
       };
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text
-        ?? (isAr ? 'عذراً، لم أتمكن من الرد.' : 'Sorry, I could not generate a response.');
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: reply }]);
-    } catch {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'Sorry, I encountered an error. Please try again.',
-      }]);
+
+      const reply =
+        data?.candidates?.[0]?.content?.parts
+          ?.map((part) => part.text ?? '')
+          .filter(Boolean)
+          .join('\n')
+          .trim() ||
+        (isAr
+          ? 'عذراً، لم أتمكن من إنشاء رد مناسب.'
+          : 'Sorry, I could not generate a proper response.');
+
+      setMessages((prev) => [...prev, makeMessage('assistant', reply)]);
+    } catch (error) {
+      console.error('[AiChat] send error:', error);
+
+      setMessages((prev) => [
+        ...prev,
+        makeMessage(
+          'assistant',
+          isAr
+            ? 'حدث خطأ أثناء إرسال الرسالة. حاول مرة أخرى.'
+            : 'An error occurred while sending the message. Please try again.'
+        ),
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const SUGGESTIONS = isAr ? SUGGESTIONS_AR : SUGGESTIONS_EN;
+  const suggestions = isAr ? SUGGESTIONS_AR : SUGGESTIONS_EN;
 
   return (
     <>
       <button
-        onClick={() => setOpen(v => !v)}
-        className="fixed bottom-6 end-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg hover:opacity-90 hover:scale-105 transition-all duration-200"
+        onClick={() => setOpen((v) => !v)}
+        className="fixed bottom-6 end-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg transition-all duration-200 hover:scale-105 hover:opacity-90"
         title={isAr ? 'المساعد الذكي' : 'Open AI Assistant'}
+        aria-label={isAr ? 'فتح المساعد الذكي' : 'Open AI Assistant'}
       >
-        {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        {open ? (
+          <X className="h-6 w-6" />
+        ) : (
+          <MessageCircle className="h-6 w-6" />
+        )}
       </button>
 
       {open && (
         <div
-          className="fixed bottom-24 end-6 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+          className="fixed bottom-24 end-6 z-50 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
           dir={isAr ? 'rtl' : 'ltr'}
         >
           <div className="flex items-center justify-between bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3">
@@ -244,86 +378,115 @@ Respond concisely and helpfully. Use EGP for currency. Keep responses focused on
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">MANGZONE AI</p>
-                <p className="text-xs text-indigo-200">{isAr ? 'المساعد الذكي' : 'Clinic Assistant'}</p>
+                <p className="text-xs text-indigo-200">
+                  {isAr ? 'المساعد الذكي' : 'Clinic Assistant'}
+                </p>
               </div>
             </div>
+
             <button
               onClick={() => setOpen(false)}
-              className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              className="rounded-lg p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label={isAr ? 'تصغير الشات' : 'Minimize chat'}
+              title={isAr ? 'تصغير' : 'Minimize'}
             >
               <Minimize2 className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-80">
-            {messages.map(msg => (
+          <div className="max-h-80 flex-1 space-y-3 overflow-y-auto p-4">
+            {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                className={`flex items-start gap-2 ${
+                  msg.role === 'user' ? 'flex-row-reverse' : ''
+                }`}
               >
-                <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
-                  msg.role === 'assistant'
-                    ? 'bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50'
-                    : 'bg-slate-100 dark:bg-slate-800'
-                }`}>
-                  {msg.role === 'assistant'
-                    ? <Bot className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                    : <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />}
+                <div
+                  className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
+                    msg.role === 'assistant'
+                      ? 'bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50'
+                      : 'bg-slate-100 dark:bg-slate-800'
+                  }`}
+                >
+                  {msg.role === 'assistant' ? (
+                    <Bot className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  ) : (
+                    <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                  )}
                 </div>
-                <div className={`rounded-2xl px-3 py-2 text-sm max-w-[80%] leading-relaxed ${
-                  msg.role === 'assistant'
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm'
-                    : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-tr-sm'
-                }`}>
+
+                <div
+                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                    msg.role === 'assistant'
+                      ? 'rounded-tl-sm bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                      : 'rounded-tr-sm bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
+                  }`}
+                >
                   {renderContent(msg.content)}
                 </div>
               </div>
             ))}
+
             {isLoading && (
               <div className="flex items-start gap-2">
                 <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50">
                   <Bot className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <div className="rounded-2xl rounded-tl-sm bg-slate-100 dark:bg-slate-800 px-3 py-2">
+
+                <div className="rounded-2xl rounded-tl-sm bg-slate-100 px-3 py-2 dark:bg-slate-800">
                   <div className="flex gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span
+                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"
+                      style={{ animationDelay: '0ms' }}
+                    />
+                    <span
+                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"
+                      style={{ animationDelay: '150ms' }}
+                    />
+                    <span
+                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"
+                      style={{ animationDelay: '300ms' }}
+                    />
                   </div>
                 </div>
               </div>
             )}
+
             <div ref={bottomRef} />
           </div>
 
           {messages.length <= 1 && (
-            <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-              {SUGGESTIONS.map(s => (
+            <div className="flex flex-wrap gap-1.5 px-4 pb-2">
+              {suggestions.map((suggestion) => (
                 <button
-                  key={s}
-                  onClick={() => handleSend(s)}
-                  className="rounded-full border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
+                  key={suggestion}
+                  onClick={() => handleSend(suggestion)}
+                  className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 transition-colors hover:border-brand-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-brand-700 dark:hover:bg-slate-800"
                 >
-                  {s}
+                  {suggestion}
                 </button>
               ))}
             </div>
           )}
 
-          <div className="border-t border-slate-100 dark:border-slate-800 p-3 flex items-center gap-2">
+          <div className="flex items-center gap-2 border-t border-slate-100 p-3 dark:border-slate-800">
             <input
               ref={inputRef}
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={isAr ? 'اسأل أي شيء...' : 'Ask anything...'}
               disabled={isLoading}
-              className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-60"
+              className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none placeholder-slate-400 focus:border-transparent focus:ring-2 focus:ring-brand-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
+
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              aria-label={isAr ? 'إرسال الرسالة' : 'Send message'}
+              title={isAr ? 'إرسال' : 'Send'}
             >
               <Send className="h-4 w-4" />
             </button>

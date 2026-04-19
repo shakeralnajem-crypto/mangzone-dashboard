@@ -51,7 +51,8 @@ export function usePatients(search = '') {
           .select('*')
           .eq('clinic_id', clinicId)
           .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(500);
 
         if (normalizedSearch) {
           query = query.or(

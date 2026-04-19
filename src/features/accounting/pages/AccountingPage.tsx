@@ -199,7 +199,7 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
             {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
           </select>
           <select className="ds-input" style={{ width: 90 }} value={year} onChange={e => setYear(Number(e.target.value))}>
-            {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt2)' }}>
             {isAr ? 'الإجمالي:' : 'Total:'} {fmt(total)}
@@ -459,7 +459,7 @@ function MonthlyReportTab({ isAr }: { isAr: boolean }) {
             {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
           </select>
           <select className="ds-input" style={{ width: 90 }} value={year} onChange={e => setYear(Number(e.target.value))}>
-            {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <button onClick={handleExport} disabled={!report} className="ds-btn ds-btn-ghost" style={{ gap: 6 }}>

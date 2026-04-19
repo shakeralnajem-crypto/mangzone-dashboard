@@ -5,6 +5,7 @@ import { AppLayout } from '@/layouts/AppLayout';
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { LandingPage } from '@/features/landing/LandingPage';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 const DashboardPage   = lazy(() => import('@/features/dashboard/pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const AppointmentsPage = lazy(() => import('@/features/appointments/pages/AppointmentsPage').then(m => ({ default: m.AppointmentsPage })));
@@ -29,7 +30,11 @@ function PageLoader() {
 }
 
 function S({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>{children}</Suspense>
+    </ErrorBoundary>
+  );
 }
 
 export const router = createBrowserRouter([

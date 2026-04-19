@@ -21,7 +21,6 @@ import {
   Legend,
 } from 'recharts';
 import {
-  TrendingUp,
   Users,
   Calendar,
   DollarSign,
@@ -443,12 +442,6 @@ export function ReportsPage() {
           icon={UserCheck}
           color="#8B5CF6"
           sub={`${isAr ? 'نسبة التحويل:' : 'Conversion:'} ${kpis.conversionRate}%`}
-        />
-        <KpiCard
-          label={isAr ? 'إيرادات الشهر' : 'Monthly Revenue'}
-          value={formatEGP(kpis.monthRevenue)}
-          icon={TrendingUp}
-          color="#059669"
         />
       </div>
 

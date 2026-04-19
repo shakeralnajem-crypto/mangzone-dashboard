@@ -194,7 +194,7 @@ export function PatientDetailModal({ patient, onClose }: Props) {
               )}
             </div>
           </div>
-          <button onClick={onClose} className="ds-modal-close"><X size={16} /></button>
+          <button onClick={onClose} className="ds-modal-close" aria-label="Close patient details"><X size={16} /></button>
         </div>
 
         {/* ── Tabs ── */}

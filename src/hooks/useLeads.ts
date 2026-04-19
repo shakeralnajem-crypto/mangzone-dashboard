@@ -22,7 +22,8 @@ export function useLeads(filters?: { search?: string; status?: string }) {
         .select('*')
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (filters?.status && filters.status !== 'ALL') q = q.eq('status', filters.status);
       if (filters?.search?.trim()) {

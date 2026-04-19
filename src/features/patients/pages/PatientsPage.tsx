@@ -479,7 +479,7 @@ export function PatientsPage() {
               marginBottom: 6,
             }}
           >
-            {search ? t.noPatientsFound : t.noPatientsFound}
+            {search ? (isAr ? 'لم يتم العثور على نتائج' : 'No results found') : t.noPatientsFound}
           </p>
           <p style={{ fontSize: 13, color: 'var(--txt3)', marginBottom: 16 }}>
             {search
