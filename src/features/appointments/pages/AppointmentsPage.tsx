@@ -205,7 +205,6 @@ function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps) {
   const { data: doctors = [] } = useDoctors();
   const { data: services = [] } = useServices();
 
-  const { data: appointments = [] } = useAppointments();
   const create = useCreateAppointment();
   const update = useUpdateAppointment();
   const createPatient = useCreatePatient();
@@ -270,30 +269,6 @@ function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps) {
     const endTime = new Date(
       startDtObj.getTime() + 30 * 60 * 1000
     ).toISOString();
-
-    if (apptType === 'patient' && form.patient_id) {
-      const newStartMs = new Date(startTime).getTime();
-
-      const duplicate = appointments.find((a) => {
-        const existingStartMs = new Date(a.start_time).getTime();
-
-        return (
-          a.patient_id === form.patient_id &&
-          existingStartMs === newStartMs &&
-          a.status !== 'CANCELLED' &&
-          a.id !== appointment?.id
-        );
-      });
-
-      if (duplicate) {
-        setSubmitError(
-          isAr
-            ? 'هذا المريض لديه موعد آخر في نفس التاريخ والوقت.'
-            : 'This patient already has an appointment at this date and time.'
-        );
-        return;
-      }
-    }
 
     // Auto-create a patient record from walk-in data (new appointments only).
     // Split the walk_in_name into first + last. If only one word, last = '-'.
