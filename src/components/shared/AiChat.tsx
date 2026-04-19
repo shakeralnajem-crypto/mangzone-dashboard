@@ -256,9 +256,9 @@ Rules:
     setInput('');
     setIsLoading(true);
 
-    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+    const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
 
-    if (!geminiKey) {
+    if (!anthropicKey) {
       const reply = getFallbackReply(content);
       setMessages((prev) => [...prev, makeMessage('assistant', reply)]);
       setIsLoading(false);
@@ -268,56 +268,43 @@ Rules:
     try {
       const systemPrompt = buildSystemPrompt();
 
-      const historyParts = currentMessages
+      const historyMessages = currentMessages
         .filter((m) => m.id !== 'welcome')
         .map((m) => ({
-          role: m.role === 'user' ? 'user' : 'model',
-          parts: [{ text: m.content }],
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.content,
         }));
 
-      historyParts.push({
-        role: 'user',
-        parts: [{ text: content }],
+      historyMessages.push({ role: 'user', content });
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
+          system: systemPrompt,
+          messages: historyMessages,
+        }),
       });
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: systemPrompt }],
-            },
-            contents: historyParts,
-            generationConfig: {
-              maxOutputTokens: 512,
-              temperature: 0.7,
-            },
-          }),
-        }
-      );
-
       if (!res.ok) {
-        throw new Error(`Gemini API error ${res.status}`);
+        throw new Error(`Claude API error ${res.status}`);
       }
 
       const data = (await res.json()) as {
-        candidates?: Array<{
-          content?: {
-            parts?: Array<{
-              text?: string;
-            }>;
-          };
-        }>;
+        content?: Array<{ type: string; text?: string }>;
       };
 
       const reply =
-        data?.candidates?.[0]?.content?.parts
-          ?.map((part) => part.text ?? '')
-          .filter(Boolean)
+        data?.content
+          ?.filter((b) => b.type === 'text')
+          .map((b) => b.text ?? '')
           .join('\n')
           .trim() ||
         (isAr

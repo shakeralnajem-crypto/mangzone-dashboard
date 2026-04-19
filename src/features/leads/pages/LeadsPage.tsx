@@ -332,16 +332,17 @@ export function LeadsPage() {
         </div>
       ) : (
         <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="ds-table-wrap">
           <table className="ds-table">
             <thead>
               <tr>
                 <th className="ds-th">{t.name}</th>
                 <th className="ds-th">{t.phone}</th>
-                <th className="ds-th">{t.service}</th>
-                <th className="ds-th">{t.source}</th>
-                <th className="ds-th">{isAr ? 'الحملة' : 'Campaign'}</th>
+                <th className="ds-th mobile-hide">{t.service}</th>
+                <th className="ds-th mobile-hide">{t.source}</th>
+                <th className="ds-th mobile-hide">{isAr ? 'الحملة' : 'Campaign'}</th>
                 <th className="ds-th">{t.status}</th>
-                <th className="ds-th">{t.followUpDate}</th>
+                <th className="ds-th mobile-hide">{t.followUpDate}</th>
                 <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
               </tr>
             </thead>
@@ -350,15 +351,15 @@ export function LeadsPage() {
                 <tr key={lead.id} className="ds-tbody-row">
                   <td className="ds-td" style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{lead.name}</td>
                   <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{lead.phone || '—'}</td>
-                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.service_interest || '—'}</td>
-                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.source || '—'}</td>
-                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.campaign || '—'}</td>
+                  <td className="ds-td mobile-hide" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.service_interest || '—'}</td>
+                  <td className="ds-td mobile-hide" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.source || '—'}</td>
+                  <td className="ds-td mobile-hide" style={{ fontSize: 12, color: 'var(--txt3)' }}>{lead.campaign || '—'}</td>
                   <td className="ds-td">
                     <span className={STATUS_CLS[lead.status] ?? 'ds-badge ds-badge-neutral'}>
                       {getStatusLabel(lead.status, isAr)}
                     </span>
                   </td>
-                  <td className="ds-td" style={{ fontSize: 12 }}>
+                  <td className="ds-td mobile-hide" style={{ fontSize: 12 }}>
                     {lead.follow_up_date ? (
                       <span style={{ fontWeight: isOverdue(lead) ? 700 : 400, color: isOverdue(lead) ? 'var(--err)' : 'var(--txt3)' }}>
                         {lead.follow_up_date}{isOverdue(lead) ? ' !' : ''}
@@ -395,6 +396,7 @@ export function LeadsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

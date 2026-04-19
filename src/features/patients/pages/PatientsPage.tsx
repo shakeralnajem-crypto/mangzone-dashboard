@@ -500,13 +500,14 @@ export function PatientsPage() {
         </div>
       ) : (
         <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="ds-table-wrap">
           <table className="ds-table">
             <thead>
               <tr>
                 <th className="ds-th">{t.name}</th>
                 <th className="ds-th">{t.phone}</th>
-                <th className="ds-th">{t.gender}</th>
-                <th className="ds-th">{t.dateOfBirth}</th>
+                <th className="ds-th mobile-hide">{t.gender}</th>
+                <th className="ds-th mobile-hide">{t.dateOfBirth}</th>
                 <th className="ds-th" style={{ textAlign: 'right' }}>
                   {t.actions}
                 </th>
@@ -598,7 +599,7 @@ export function PatientsPage() {
                       <span style={{ color: 'var(--txt3)' }}>—</span>
                     )}
                   </td>
-                  <td className="ds-td">
+                  <td className="ds-td mobile-hide">
                     {p.gender ? (
                       <span className="ds-badge ds-badge-neutral">
                         {p.gender === 'MALE'
@@ -612,7 +613,7 @@ export function PatientsPage() {
                     )}
                   </td>
                   <td
-                    className="ds-td"
+                    className="ds-td mobile-hide"
                     style={{ fontSize: 13, color: 'var(--txt2)' }}
                   >
                     {p.dob
@@ -652,6 +653,7 @@ export function PatientsPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {/* Pagination */}
           {totalPages > 1 && (
             <div style={{

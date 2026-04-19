@@ -10,8 +10,8 @@ interface BrandLogoProps {
 const sizes = {
   sm: { height: 36 },
   md: { height: 48 },
-  lg: { height: 80 },
-  xl: { height: 120 },
+  lg: { height: 140 },
+  xl: { height: 180 },
 };
 
 export function BrandLogo({
@@ -23,7 +23,7 @@ export function BrandLogo({
   return (
     <div className={cn('flex items-center', className)}>
       <img
-        src="/logo.png"
+        src="/logo.svg"
         alt="MANGZONE"
         style={{ height, width: 'auto', objectFit: 'contain' }}
         draggable={false}

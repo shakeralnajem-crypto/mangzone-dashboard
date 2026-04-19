@@ -1,6 +1,13 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+const STORAGE_KEY = 'i18nextLng';
+const getInitialLanguage = () => {
+  if (typeof window === 'undefined') return 'ar';
+  const storedLanguage = window.localStorage.getItem(STORAGE_KEY);
+  return storedLanguage === 'ar' || storedLanguage === 'en' ? storedLanguage : 'ar';
+};
+
 const resources = {
   en: {
     translation: {
@@ -106,11 +113,16 @@ const resources = {
 
 i18n.use(initReactI18next).init({
   resources,
-  lng: 'en',
-  fallbackLng: 'en',
+  lng: getInitialLanguage(),
+  fallbackLng: 'ar',
   interpolation: {
     escapeValue: false,
   },
+});
+
+i18n.on('languageChanged', (language) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(STORAGE_KEY, language);
 });
 
 export default i18n;

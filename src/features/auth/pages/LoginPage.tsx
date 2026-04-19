@@ -103,7 +103,7 @@ export function LoginPage() {
   return (
     <div
       className={`flex min-h-screen ${isRtl ? 'font-arabic' : 'font-sans'}`}
-      dir={isRtl ? 'rtl' : 'ltr'}
+      dir="ltr"
     >
       {/* Left panel — brand showcase */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] relative overflow-hidden">
@@ -119,11 +119,25 @@ export function LoginPage() {
           }}
         />
         {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
-          <div>
-            <BrandLogo size="lg" variant="white" />
+        <div className="relative z-10 flex flex-col items-center justify-center gap-10 p-12 text-white w-full">
+          {/* Logo animated */}
+          <div style={{ position: 'relative', width: 300, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <style>{`
+              @keyframes blobMorph{0%,100%{border-radius:60% 40% 55% 45%/50% 60% 40% 50%}25%{border-radius:40% 60% 45% 55%/60% 40% 60% 40%}50%{border-radius:55% 45% 65% 35%/40% 55% 45% 60%}75%{border-radius:45% 55% 38% 62%/55% 45% 55% 45%}}
+              @keyframes blobRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+              @keyframes blobGlow{0%,100%{opacity:.6}50%{opacity:1}}
+              @keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+            `}</style>
+            {/* Rotating gradient ring */}
+            <div style={{ position:'absolute', inset:-24, borderRadius:'50%', background:'conic-gradient(from 0deg,rgba(255,255,255,0.6),rgba(167,139,250,0.4),rgba(255,255,255,0.1),rgba(192,132,252,0.5),rgba(255,255,255,0.6))', animation:'blobRotate 6s linear infinite', filter:'blur(2px)' }} />
+            {/* Outer blob */}
+            <div style={{ position:'absolute', inset:4, background:'rgba(255,255,255,0.18)', backdropFilter:'blur(8px)', animation:'blobMorph 7s ease-in-out infinite, blobGlow 3.5s ease-in-out infinite', border:'1px solid rgba(255,255,255,0.5)' }} />
+            {/* Inner blob with logo */}
+            <div style={{ position:'relative', zIndex:2, width:220, height:220, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', animation:'blobMorph 7s ease-in-out infinite reverse, logoFloat 4s ease-in-out infinite', boxShadow:'0 12px 48px rgba(109,40,217,0.3)', padding:28 }}>
+              <BrandLogo size="xl" variant="white" />
+            </div>
           </div>
-          <div className="space-y-6 max-w-md">
+          <div className="space-y-6 max-w-md text-center">
             <h1 className="text-4xl font-bold leading-tight">
               {isRtl
                 ? 'إدارة عيادتك بذكاء واحترافية'

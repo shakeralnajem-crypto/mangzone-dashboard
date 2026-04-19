@@ -70,6 +70,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
   const { profile, clearAuth } = useAuthStore();
+  const { theme } = useThemeStore();
   const isAr = i18n.language === 'ar';
   const t = useT(isAr);
 
@@ -86,11 +87,11 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   return (
     <aside style={{ width: 190, flexShrink: 0, background: 'var(--bg2)', borderRight: '1px solid var(--brd)', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Logo */}
-      <div style={{ padding: '0 10px', borderBottom: '1px solid var(--brd)', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--brd)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <img
-          src="/logo.png"
+          src={theme === 'dark' ? '/logo-dark.svg' : '/logo.svg'}
           alt="MANGZONE"
-          style={{ width: '100%', height: 'auto', maxHeight: 200, objectFit: 'contain', display: 'block', margin: '-30px 0 -42px' }}
+          style={{ width: '100%', height: 'auto', maxHeight: 120, objectFit: 'contain', display: 'block' }}
           draggable={false}
         />
         {onClose && (
@@ -175,7 +176,7 @@ export function AppLayout() {
   const canRedo = future.length > 0 && !isProcessing;
 
   useEffect(() => {
-    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
+    document.documentElement.dir = 'ltr';
     document.documentElement.lang = i18n.language;
   }, [i18n.language, isAr]);
 

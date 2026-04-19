@@ -1,6 +1,6 @@
 export const BRAND = {
   name: 'MANGZONE',
-  logo: '/logo.png',
+  logo: '/logo.svg',
   description: 'Premium Dental Clinic Management System',
   theme: {
     // Matches the logo gradient: indigo → purple → fuchsia
