@@ -160,7 +160,7 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
   const create = useCreateExpense();
   const remove = useDeleteExpense();
   const { pushAction } = useHistoryStore();
-  const { can } = usePermissions();
+  const { can, canAction } = usePermissions();
 
   const months = isAr ? MONTHS_AR : MONTHS_EN;
 
@@ -263,77 +263,139 @@ function ExpensesTab({ isAr }: { isAr: boolean }) {
           <div className="ds-spinner" />
         </div>
       ) : expenses.length === 0 ? (
-        <div className="ds-empty" style={{ padding: '40px 24px' }}>
-          <p style={{ fontSize: 14, color: 'var(--txt3)' }}>
-            {isAr ? 'لا توجد مصروفات مسجلة لهذا الشهر.' : 'No expenses recorded for this month.'}
+        <div className="ds-empty" style={{ padding: '48px 24px' }}>
+          <TrendingDown size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)', marginBottom: 6 }}>
+            {isAr ? 'لا توجد مصروفات' : 'No expenses yet'}
           </p>
+          <p style={{ fontSize: 13, color: 'var(--txt3)', marginBottom: 16 }}>
+            {isAr ? 'سجّل أول مصروف لهذا الشهر.' : 'Record your first expense for this month.'}
+          </p>
+          {canAction('create:expense') && (
+            <button onClick={() => setShowForm(true)} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+              <Plus size={14} strokeWidth={2.5} /> {t.addExpense}
+            </button>
+          )}
         </div>
       ) : (
-        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="ds-table">
-            <thead>
-              <tr>
-                <th className="ds-th">{t.category}</th>
-                <th className="ds-th">{t.description}</th>
-                <th className="ds-th">{t.date}</th>
-                <th className="ds-th">{isAr ? 'مدفوع لـ' : 'Paid To'}</th>
-                <th className="ds-th" style={{ textAlign: 'right' }}>{t.amount}</th>
-                <th className="ds-th" />
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.map(exp => {
-                const catIndex = EXPENSE_CATEGORIES_EN.indexOf(exp.category);
-                const catLabel = isAr && catIndex >= 0 ? EXPENSE_CATEGORIES_AR[catIndex] : exp.category;
-                return (
-                  <tr key={exp.id} className="ds-tbody-row">
-                    <td className="ds-td">
-                      <span className="ds-badge ds-badge-neutral">{catLabel}</span>
-                    </td>
-                    <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{exp.description || '—'}</td>
-                    <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.expense_date}</td>
-                    <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.paid_to || '—'}</td>
-                    <td className="ds-td" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--txt)' }}>{fmt(exp.amount)}</td>
-                    <td className="ds-td">
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                        <button onClick={() => setEditingExpense(exp)} className="ds-icon-btn" title={t.edit}>
-                          <Edit2 size={13} />
-                        </button>
-                        {can('delete:expense') && (
-                          <button onClick={async () => {
-                            if (!confirm(isAr ? `حذف هذا المصروف؟` : `Delete this expense?`)) return;
-                            await remove.mutateAsync(exp.id);
-                            let restoredId = exp.id;
-                            pushAction({
-                              id: crypto.randomUUID(),
-                              timestamp: Date.now(),
-                              description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
-                              description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
-                              undo: async () => {
-                                const created = await create.mutateAsync({
-                                  category: exp.category,
-                                  description: exp.description,
-                                  amount: exp.amount,
-                                  expense_date: exp.expense_date,
-                                  paid_to: exp.paid_to,
-                                  notes: exp.notes,
-                                });
-                                restoredId = created.id;
-                              },
-                              redo: async () => { await remove.mutateAsync(restoredId); },
+        <>
+          {/* Mobile cards */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {expenses.map(exp => {
+              const catIndex = EXPENSE_CATEGORIES_EN.indexOf(exp.category);
+              const catLabel = isAr && catIndex >= 0 ? EXPENSE_CATEGORIES_AR[catIndex] : exp.category;
+              return (
+                <div key={exp.id} className="ds-card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)', marginBottom: 4 }}>
+                        {exp.description || catLabel}
+                      </p>
+                      <span className="ds-badge ds-badge-neutral" style={{ fontSize: 11 }}>{catLabel}</span>
+                    </div>
+                    <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--txt)', marginLeft: 12, flexShrink: 0 }}>
+                      {fmt(exp.amount)}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
+                    <p style={{ fontSize: 12, color: 'var(--txt3)' }}>📅 {exp.expense_date}</p>
+                    {exp.paid_to && <p style={{ fontSize: 12, color: 'var(--txt3)' }}>→ {exp.paid_to}</p>}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--brd)', paddingTop: 10 }}>
+                    <button onClick={() => setEditingExpense(exp)} className="ds-icon-btn" title={t.edit}>
+                      <Edit2 size={15} />
+                    </button>
+                    {can('delete:expense') && (
+                      <button onClick={async () => {
+                        if (!confirm(isAr ? `حذف هذا المصروف؟` : `Delete this expense?`)) return;
+                        await remove.mutateAsync(exp.id);
+                        let restoredId = exp.id;
+                        pushAction({
+                          id: crypto.randomUUID(),
+                          timestamp: Date.now(),
+                          description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
+                          description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
+                          undo: async () => {
+                            const created = await create.mutateAsync({
+                              category: exp.category,
+                              description: exp.description,
+                              amount: exp.amount,
+                              expense_date: exp.expense_date,
+                              paid_to: exp.paid_to,
+                              notes: exp.notes,
                             });
-                          }} className="ds-icon-btn-err" title={t.delete}>
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                            restoredId = created.id;
+                          },
+                          redo: async () => { await remove.mutateAsync(restoredId); },
+                        });
+                      }} className="ds-icon-btn-err" title={t.delete}>
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="ds-card hidden md:block" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="ds-table">
+              <thead>
+                <tr>
+                  <th className="ds-th">{t.category}</th>
+                  <th className="ds-th">{t.description}</th>
+                  <th className="ds-th">{t.date}</th>
+                  <th className="ds-th">{isAr ? 'مدفوع لـ' : 'Paid To'}</th>
+                  <th className="ds-th" style={{ textAlign: 'right' }}>{t.amount}</th>
+                  <th className="ds-th" />
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map(exp => {
+                  const catIndex = EXPENSE_CATEGORIES_EN.indexOf(exp.category);
+                  const catLabel = isAr && catIndex >= 0 ? EXPENSE_CATEGORIES_AR[catIndex] : exp.category;
+                  return (
+                    <tr key={exp.id} className="ds-tbody-row">
+                      <td className="ds-td"><span className="ds-badge ds-badge-neutral">{catLabel}</span></td>
+                      <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{exp.description || '—'}</td>
+                      <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.expense_date}</td>
+                      <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>{exp.paid_to || '—'}</td>
+                      <td className="ds-td" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--txt)' }}>{fmt(exp.amount)}</td>
+                      <td className="ds-td">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                          <button onClick={() => setEditingExpense(exp)} className="ds-icon-btn" title={t.edit}><Edit2 size={13} /></button>
+                          {can('delete:expense') && (
+                            <button onClick={async () => {
+                              if (!confirm(isAr ? `حذف هذا المصروف؟` : `Delete this expense?`)) return;
+                              await remove.mutateAsync(exp.id);
+                              let restoredId = exp.id;
+                              pushAction({
+                                id: crypto.randomUUID(),
+                                timestamp: Date.now(),
+                                description: `Deleted expense: ${exp.category} ${exp.amount} EGP`,
+                                description_ar: `حُذف مصروف: ${exp.category} ${exp.amount} ج.م`,
+                                undo: async () => {
+                                  const created = await create.mutateAsync({
+                                    category: exp.category, description: exp.description,
+                                    amount: exp.amount, expense_date: exp.expense_date,
+                                    paid_to: exp.paid_to, notes: exp.notes,
+                                  });
+                                  restoredId = created.id;
+                                },
+                                redo: async () => { await remove.mutateAsync(restoredId); },
+                              });
+                            }} className="ds-icon-btn-err" title={t.delete}><Trash2 size={13} /></button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {editingExpense && (
@@ -389,40 +451,71 @@ function DoctorDuesTab({ isAr }: { isAr: boolean }) {
           <div className="ds-spinner" />
         </div>
       ) : dues.length === 0 ? (
-        <div className="ds-empty" style={{ padding: '40px 24px' }}>
-          <p style={{ fontSize: 14, color: 'var(--txt3)' }}>
-            {isAr ? 'لا توجد فواتير مدفوعة مع أطباء مخصصين.' : 'No paid invoices with assigned doctors found.'}
+        <div className="ds-empty" style={{ padding: '48px 24px' }}>
+          <DollarSign size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)', marginBottom: 6 }}>
+            {isAr ? 'لا توجد مستحقات' : 'No doctor dues'}
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--txt3)' }}>
+            {isAr ? 'تظهر هنا مستحقات الأطباء عند وجود فواتير مدفوعة.' : 'Doctor dues appear here once paid invoices exist.'}
           </p>
         </div>
       ) : (
-        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="ds-table">
-            <thead>
-              <tr>
-                <th className="ds-th">{t.doctor}</th>
-                <th className="ds-th" style={{ textAlign: 'right' }}>{isAr ? 'الفواتير' : 'Invoices'}</th>
-                <th className="ds-th" style={{ textAlign: 'right' }}>{isAr ? 'إجمالي الفواتير' : 'Total Billed'}</th>
-                <th className="ds-th" style={{ textAlign: 'right' }}>
-                  {isAr ? `العيادة (${clinicPercent}%)` : `Clinic (${clinicPercent}%)`}
-                </th>
-                <th className="ds-th" style={{ textAlign: 'right' }}>
-                  {isAr ? `مستحق الطبيب (${100 - clinicPercent}%)` : `Doctor Due (${100 - clinicPercent}%)`}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {dues.map(d => (
-                <tr key={d.doctorId} className="ds-tbody-row">
-                  <td className="ds-td" style={{ fontWeight: 600, color: 'var(--txt)' }}>{d.doctorName}</td>
-                  <td className="ds-td" style={{ textAlign: 'right', color: 'var(--txt2)' }}>{d.invoiceCount}</td>
-                  <td className="ds-td" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--txt)' }}>{fmt(d.totalBilled)}</td>
-                  <td className="ds-td" style={{ textAlign: 'right', color: 'var(--txt2)' }}>{fmt(d.clinicShare)}</td>
-                  <td className="ds-td" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--ok)' }}>{fmt(d.doctorDue)}</td>
+        <>
+          {/* Mobile cards */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {dues.map(d => (
+              <div key={d.doctorId} className="ds-card" style={{ padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)' }}>{d.doctorName}</p>
+                  <span style={{ fontSize: 11, color: 'var(--txt3)' }}>
+                    {d.invoiceCount} {isAr ? 'فاتورة' : 'invoices'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center', marginBottom: 10 }}>
+                  <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '8px 4px' }}>
+                    <p style={{ fontSize: 10, color: 'var(--txt3)', marginBottom: 3 }}>{isAr ? 'الإجمالي' : 'Total'}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt)' }}>{fmt(d.totalBilled)}</p>
+                  </div>
+                  <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: '8px 4px' }}>
+                    <p style={{ fontSize: 10, color: 'var(--txt3)', marginBottom: 3 }}>{isAr ? `العيادة ${clinicPercent}%` : `Clinic ${clinicPercent}%`}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt2)' }}>{fmt(d.clinicShare)}</p>
+                  </div>
+                  <div style={{ background: 'rgba(5,150,105,0.08)', borderRadius: 8, padding: '8px 4px' }}>
+                    <p style={{ fontSize: 10, color: 'var(--txt3)', marginBottom: 3 }}>{isAr ? `الطبيب ${100 - clinicPercent}%` : `Doctor ${100 - clinicPercent}%`}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--ok)' }}>{fmt(d.doctorDue)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="ds-card hidden md:block" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="ds-table">
+              <thead>
+                <tr>
+                  <th className="ds-th">{t.doctor}</th>
+                  <th className="ds-th" style={{ textAlign: 'right' }}>{isAr ? 'الفواتير' : 'Invoices'}</th>
+                  <th className="ds-th" style={{ textAlign: 'right' }}>{isAr ? 'إجمالي الفواتير' : 'Total Billed'}</th>
+                  <th className="ds-th" style={{ textAlign: 'right' }}>{isAr ? `العيادة (${clinicPercent}%)` : `Clinic (${clinicPercent}%)`}</th>
+                  <th className="ds-th" style={{ textAlign: 'right' }}>{isAr ? `مستحق الطبيب (${100 - clinicPercent}%)` : `Doctor Due (${100 - clinicPercent}%)`}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {dues.map(d => (
+                  <tr key={d.doctorId} className="ds-tbody-row">
+                    <td className="ds-td" style={{ fontWeight: 600, color: 'var(--txt)' }}>{d.doctorName}</td>
+                    <td className="ds-td" style={{ textAlign: 'right', color: 'var(--txt2)' }}>{d.invoiceCount}</td>
+                    <td className="ds-td" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--txt)' }}>{fmt(d.totalBilled)}</td>
+                    <td className="ds-td" style={{ textAlign: 'right', color: 'var(--txt2)' }}>{fmt(d.clinicShare)}</td>
+                    <td className="ds-td" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--ok)' }}>{fmt(d.doctorDue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

@@ -376,9 +376,17 @@ export function ContentPage() {
       ) : viewMode === 'calendar' ? (
         <CalendarView posts={posts} isAr={isAr} onEdit={openEdit} />
       ) : posts.length === 0 ? (
-        <div className="ds-empty">
+        <div className="ds-empty" style={{ padding: '48px 24px' }}>
           <Share2 size={40} style={{ color: 'var(--txt3)', marginBottom: 12 }} />
-          <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{t.noPostsFound}</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--txt)', marginBottom: 6 }}>
+            {isAr ? 'لا توجد منشورات' : 'No posts yet'}
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--txt3)', marginBottom: 16 }}>
+            {isAr ? 'ابدأ بإنشاء أول منشور لعيادتك.' : 'Start by creating your first clinic post.'}
+          </p>
+          <button type="button" onClick={openAdd} className="ds-btn ds-btn-primary" style={{ gap: 6 }}>
+            <Plus size={14} strokeWidth={2.5} /> {isAr ? 'إنشاء منشور' : 'Create post'}
+          </button>
         </div>
       ) : (
         <>
@@ -421,9 +429,9 @@ export function ContentPage() {
                     <td className="ds-td">
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                         {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
-                        <button onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
+                        <button type="button" title="Edit" onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
                         {can('delete:content') && (
-                          <button onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                          <button type="button" title="Delete" onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
                         )}
                       </div>
                     </td>
