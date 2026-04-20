@@ -67,6 +67,26 @@ export function AppointmentsPage() {
     const appt = allAppointments.find((a) => a.id === id);
     const oldStatus = (appt?.status ?? 'SCHEDULED') as (typeof STATUSES)[number];
     updateAppt.mutate({ id, values: { status: newStatus as typeof oldStatus } });
+
+    // Telegram notification (fire-and-forget)
+    if (appt) {
+      const patientName = appt.patient
+        ? `${appt.patient.first_name} ${appt.patient.last_name}`
+        : (appt.walk_in_name ?? '—');
+      const apptDate = new Date(appt.start_time);
+      fetch('/api/notify-appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'status',
+          patientName,
+          date: apptDate.toLocaleDateString('ar-EG'),
+          time: apptDate.toLocaleTimeString('ar-EG', { timeStyle: 'short' }),
+          status: newStatus,
+        }),
+      }).catch(() => null);
+    }
+
     pushAction({
       id: crypto.randomUUID(),
       timestamp: Date.now(),

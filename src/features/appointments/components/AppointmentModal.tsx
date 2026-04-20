@@ -133,6 +133,25 @@ export function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps)
       } else {
         await create.mutateAsync(payload as Omit<AppointmentInsert, 'clinic_id' | 'created_by'>);
       }
+
+      // Telegram notification (fire-and-forget)
+      const patientName = apptType === 'walkin' ? form.walk_in_name.trim() : '';
+      const serviceName = services.find(s => s.id === form.service_id)?.name ?? '';
+      const doctorName  = doctors.find(d => d.id === form.doctor_ref_id)?.full_name ?? '';
+      fetch('/api/notify-appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: isEdit ? 'updated' : 'created',
+          patientName,
+          date: form.date,
+          time: form.time,
+          service: serviceName,
+          doctor: doctorName,
+          status: getStatusLabel(form.status, true),
+        }),
+      }).catch(() => null);
+
       onClose();
     } catch (err) {
       const msg = err instanceof Error
