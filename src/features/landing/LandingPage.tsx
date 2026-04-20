@@ -308,6 +308,7 @@ export function LandingPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const navRef = useRef<HTMLElement>(null);
   const barsRef = useRef<HTMLDivElement>(null);
   const language: LandingLanguage = (i18n.resolvedLanguage ?? i18n.language ?? 'ar').startsWith('ar') ? 'ar' : 'en';
@@ -338,17 +339,19 @@ export function LandingPage() {
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+    setSubmitError(false);
     fetch('/api/lead-submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),
     })
-      .catch(() => null)
-      .finally(() => {
-        setSubmitting(false);
+      .then(res => {
+        if (!res.ok) throw new Error('failed');
         setSubmitted(true);
-        setFormData({ fullName: '', phone: '01', clinicName: '', teamSize: '', notes: '' });
-      });
+        setFormData({ fullName: '', phone: '', clinicName: '', teamSize: '', notes: '' });
+      })
+      .catch(() => setSubmitError(true))
+      .finally(() => setSubmitting(false));
   };
 
   // Reveal animations
@@ -1088,6 +1091,11 @@ export function LandingPage() {
               <button className="lp-form-submit" type="submit" disabled={submitting}>
                 {submitted ? (isAr ? '✓ تم الإرسال بنجاح!' : '✓ Sent successfully!') : submitting ? (isAr ? 'جاري الإرسال...' : 'Sending...') : content.form.submit}
               </button>
+              {submitError && (
+                <p style={{ textAlign: 'center', color: '#ef4444', fontSize: 13, marginTop: 8 }}>
+                  {isAr ? 'حدث خطأ، حاول مرة أخرى.' : 'Something went wrong, please try again.'}
+                </p>
+              )}
             </form>
 
             <p className="lp-form-trust">{content.form.trust}</p>

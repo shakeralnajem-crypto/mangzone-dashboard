@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useT } from '@/lib/translations';
 import { useHistoryStore } from '@/store/historyStore';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useNewLeadsCount } from '@/hooks/useNewLeadsCount';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -73,6 +74,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   const { theme } = useThemeStore();
   const isAr = i18n.language === 'ar';
   const t = useT(isAr);
+  const { data: newLeadsCount = 0 } = useNewLeadsCount();
 
   const allowedNav = navItems.filter(item => profile?.role && item.roles.includes(profile.role));
 
@@ -117,7 +119,17 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
                   className={({ isActive }) => cn('sidebar-nav-item', isActive && 'active')}
                 >
                   <Icon className="sidebar-nav-icon" />
-                  <span>{isAr ? label_ar : label_en}</span>
+                  <span style={{ flex: 1 }}>{isAr ? label_ar : label_en}</span>
+                  {to === '/leads' && newLeadsCount > 0 && (
+                    <span style={{
+                      background: '#ef4444', color: '#fff',
+                      fontSize: 10, fontWeight: 800,
+                      borderRadius: 20, padding: '1px 6px',
+                      minWidth: 18, textAlign: 'center', lineHeight: '16px',
+                    }}>
+                      {newLeadsCount > 99 ? '99+' : newLeadsCount}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -245,28 +257,22 @@ export function AppLayout() {
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Language */}
-            <button
-              onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
-              className="ds-btn ds-btn-ghost"
-              style={{ padding: '7px 13px', fontSize: 12 }}
-            >
-              {isAr ? 'EN' : 'عربي'}
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
 
-            {/* Undo */}
+
+            {/* Undo — desktop only */}
             <button
               onClick={undo}
               disabled={!canUndo}
               title={`Undo${past.length > 0 ? ` (${past.length})` : ''} — Ctrl+Z`}
+              className="hidden lg:flex"
               style={{
                 width: 36, height: 36, borderRadius: 10,
                 border: '1px solid var(--brd)',
                 background: canUndo ? 'var(--p-soft)' : 'var(--p-ultra)',
                 color: canUndo ? 'var(--p2)' : 'var(--txt3)',
                 cursor: canUndo ? 'pointer' : 'not-allowed',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.2s', opacity: canUndo ? 1 : 0.45,
                 position: 'relative', flexShrink: 0,
               }}
@@ -285,34 +291,44 @@ export function AppLayout() {
               )}
             </button>
 
-            {/* Redo */}
+            {/* Redo — desktop only */}
             <button
               onClick={redo}
               disabled={!canRedo}
               title={`Redo${future.length > 0 ? ` (${future.length})` : ''} — Ctrl+Shift+Z`}
+              className="hidden lg:flex"
               style={{
                 width: 36, height: 36, borderRadius: 10,
                 border: '1px solid var(--brd)',
                 background: 'var(--p-ultra)',
                 color: canRedo ? 'var(--txt2)' : 'var(--txt3)',
                 cursor: canRedo ? 'pointer' : 'not-allowed',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.2s', opacity: canRedo ? 1 : 0.45, flexShrink: 0,
               }}
             >
               <Redo2 size={16} />
             </button>
 
-            {/* Theme */}
-            <button className="ds-icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
-              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
+            {/* Lang + Theme — desktop only */}
+            <div className="hidden lg:flex" style={{ alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => i18n.changeLanguage(isAr ? 'en' : 'ar')}
+                className="ds-btn ds-btn-ghost"
+                style={{ padding: '7px 13px', fontSize: 12 }}
+              >
+                {isAr ? 'EN' : 'عربي'}
+              </button>
+              <button className="ds-icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+                {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+            </div>
 
-            {/* Primary action — hidden for roles without appointments access */}
+            {/* Primary action */}
             {canAction('create:appointment') && (
               <button className="ds-btn ds-btn-primary" onClick={() => navigate('/appointments')}>
                 <Plus size={15} strokeWidth={2.5} />
-                {t.newAppointment}
+                <span className="hidden sm:inline">{t.newAppointment}</span>
               </button>
             )}
           </div>
