@@ -198,6 +198,7 @@ const LANDING_TEXT = {
       fullNameLabel: 'الاسم الكامل *',
       fullNamePlaceholder: 'اكتب اسمك الكامل',
       phoneLabel: 'رقم الهاتف',
+      phonePlaceholder: 'اكتب رقم هاتفك',
       clinicLabel: 'اسم العيادة',
       clinicPlaceholder: 'اسم العيادة أو المركز',
       teamLabel: 'حجم الفريق',
@@ -263,6 +264,7 @@ const LANDING_TEXT = {
       fullNameLabel: 'Full name *',
       fullNamePlaceholder: 'Enter your full name',
       phoneLabel: 'Phone number',
+      phonePlaceholder: 'Enter your phone number',
       clinicLabel: 'Clinic name',
       clinicPlaceholder: 'Clinic or center name',
       teamLabel: 'Team size',
@@ -1044,7 +1046,7 @@ export function LandingPage() {
                   pattern="[0-9]*"
                   value={formData.phone}
                   onChange={handlePhoneChange}
-                  placeholder="01"
+                  placeholder={content.form.phonePlaceholder ?? ''}
                 />
               </label>
 
