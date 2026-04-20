@@ -47,14 +47,11 @@ export function AppointmentsPage() {
   const [filterStatus, setFilterStatus] = useState('');
 
   const { data: doctors = [] } = useDoctors();
-  const { data: allAppointments = [], isLoading, error } = useAppointments({
+  const { data: appointments = [], isLoading, error } = useAppointments({
     doctorId: filterDoctor || undefined,
     status: filterStatus || undefined,
+    date: filterDate || undefined,
   });
-
-  const appointments = filterDate
-    ? allAppointments.filter((a) => a.start_time.slice(0, 10) === filterDate)
-    : allAppointments;
 
   const updateAppt = useUpdateAppointment();
   const deleteAppt = useDeleteAppointment();
@@ -64,7 +61,7 @@ export function AppointmentsPage() {
   const errorMessage = error instanceof Error ? error.message : (isAr ? 'فشل تحميل المواعيد.' : 'Failed to load appointments.');
 
   const handleStatusChange = (id: string, newStatus: string) => {
-    const appt = allAppointments.find((a) => a.id === id);
+    const appt = appointments.find((a) => a.id === id);
     const oldStatus = (appt?.status ?? 'SCHEDULED') as (typeof STATUSES)[number];
     updateAppt.mutate({ id, values: { status: newStatus as typeof oldStatus } });
 
@@ -175,7 +172,7 @@ export function AppointmentsPage() {
 
       {/* Today's Doctor Grid */}
       {!compareMode && !filterDate && !filterDoctor && !filterStatus && !isLoading && (
-        <TodayDoctorGrid appointments={allAppointments as RichAppt[]} isAr={isAr} />
+        <TodayDoctorGrid appointments={appointments as RichAppt[]} isAr={isAr} />
       )}
 
       {/* Main content */}

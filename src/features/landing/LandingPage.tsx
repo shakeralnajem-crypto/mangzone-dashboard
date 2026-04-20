@@ -38,14 +38,14 @@ const STEPS = {
 
 const TESTIMONIALS = {
   ar: [
-    { name: 'د. أحمد العمري', role: 'طبيب أسنان — القاهرة', text: 'النظام غيّر طريقة إدارة عيادتي بالكامل. الآن أتابع كل شيء من هاتفي.', stars: 5 },
-    { name: 'د. سارة محمد', role: 'طبيبة — الإسكندرية', text: 'التقارير المالية وفّرت علي ساعات من العمل اليدوي كل أسبوع. ممتاز جداً.', stars: 5 },
-    { name: 'أ. خالد الرشيد', role: 'مدير عيادة — الرياض', text: 'سهل الاستخدام ويعمل بسلاسة على الجوال والكمبيوتر. الدعم سريع وممتاز.', stars: 5 },
+    { name: 'د. أحمد العمري', role: 'طبيب أسنان — القاهرة', text: 'النظام غيّر طريقة إدارة عيادتي بالكامل. الآن أتابع كل شيء من هاتفي.', stars: 5, date: 'مارس ٢٠٢٦' },
+    { name: 'د. سارة محمد', role: 'طبيبة — الإسكندرية', text: 'التقارير المالية وفّرت علي ساعات من العمل اليدوي كل أسبوع. ممتاز جداً.', stars: 5, date: 'فبراير ٢٠٢٦' },
+    { name: 'أ. خالد الرشيد', role: 'مدير عيادة — الرياض', text: 'سهل الاستخدام ويعمل بسلاسة على الجوال والكمبيوتر. الدعم سريع وممتاز.', stars: 5, date: 'أبريل ٢٠٢٦' },
   ],
   en: [
-    { name: 'Dr. Ahmed Al-Omari', role: 'Dentist — Cairo', text: 'The system completely changed how I manage my clinic. Now I can track everything from my phone.', stars: 5 },
-    { name: 'Dr. Sara Mohamed', role: 'Dentist — Alexandria', text: 'The financial reports save me hours of manual work every week. Truly excellent.', stars: 5 },
-    { name: 'Khaled Al-Rashid', role: 'Clinic Manager — Riyadh', text: 'Easy to use and smooth on both mobile and desktop. Support is fast and excellent.', stars: 5 },
+    { name: 'Dr. Ahmed Al-Omari', role: 'Dentist — Cairo', text: 'The system completely changed how I manage my clinic. Now I can track everything from my phone.', stars: 5, date: 'March 2026' },
+    { name: 'Dr. Sara Mohamed', role: 'Dentist — Alexandria', text: 'The financial reports save me hours of manual work every week. Truly excellent.', stars: 5, date: 'February 2026' },
+    { name: 'Khaled Al-Rashid', role: 'Clinic Manager — Riyadh', text: 'Easy to use and smooth on both mobile and desktop. Support is fast and excellent.', stars: 5, date: 'April 2026' },
   ],
 } as const;
 
@@ -497,8 +497,9 @@ export function LandingPage() {
         .lp-blue{color:var(--blue)}
         .lp-sub{position:relative;z-index:3;font-size:clamp(15px,1.7vw,19px);color:var(--txt2);line-height:1.8;max-width:540px;margin:0 auto 44px;animation:lpFade .6s .3s ease both}
         .lp-hbtns{position:relative;z-index:3;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:72px;animation:lpFade .6s .4s ease both}
-        .lp-bp{padding:16px 42px;border-radius:100px;background:var(--blue);color:#fff;font-family:var(--font-arabic);font-size:16px;font-weight:700;border:none;cursor:pointer;box-shadow:0 6px 20px var(--shadow);transition:all .25s}
-        .lp-bp:hover{background:var(--blue2);transform:translateY(-3px);box-shadow:0 10px 30px var(--shadow)}
+        .lp-bp{padding:16px 42px;border-radius:100px;background:var(--blue);color:#fff;font-family:var(--font-arabic);font-size:16px;font-weight:700;border:none;cursor:pointer;box-shadow:0 6px 20px var(--shadow),0 0 0 0 color-mix(in srgb,var(--blue) 38%,transparent);transition:all .25s;animation:lpCtaPulse 2.8s ease-in-out infinite}
+        .lp-bp:hover{background:var(--blue2);transform:translateY(-3px);box-shadow:0 10px 30px var(--shadow),0 0 0 0 transparent;animation:none}
+        @keyframes lpCtaPulse{0%,100%{box-shadow:0 6px 20px var(--shadow),0 0 0 0 color-mix(in srgb,var(--blue) 38%,transparent)}60%{box-shadow:0 6px 20px var(--shadow),0 0 0 12px transparent}}
         .lp-bs{padding:16px 42px;border-radius:100px;background:transparent;color:var(--txt);font-family:var(--font-arabic);font-size:16px;font-weight:700;border:1.5px solid var(--brd);cursor:pointer;transition:all .25s}
         .lp-bs:hover{border-color:var(--blue);color:var(--blue);background:var(--blue3);transform:translateY(-3px)}
         @keyframes lpFade{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -601,6 +602,9 @@ export function LandingPage() {
         .lp-tc-av{width:42px;height:42px;border-radius:50%;background:var(--blue3);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0}
         .lp-tc-name{font-size:14px;font-weight:800;color:var(--txt)}
         .lp-tc-role{font-size:12px;color:var(--txt3)}
+        .lp-tc-footer{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--brd)}
+        .lp-tc-date{font-size:11px;color:var(--txt3)}
+        .lp-tc-verified{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#10b981;background:rgba(16,185,129,.08);padding:3px 9px;border-radius:100px;border:1px solid rgba(16,185,129,.2)}
 
         /* ROLES */
         .lp-rg{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
@@ -690,8 +694,8 @@ export function LandingPage() {
           .lp-nav-mini{display:none}
           .lp-hamburger{display:flex;grid-area:hamburger;justify-self:start;order:1}
           .lpnav-brand{grid-area:brand;justify-self:center;width:clamp(130px,34vw,165px);max-width:50vw;order:2;transform:translateX(20px)}
-          .lpncta{grid-area:cta;justify-self:end;min-height:36px;padding:0 12px;font-size:12px;order:3}
-          .lp-hero{padding:100px 20px 40px}
+          .lpncta{grid-area:cta;justify-self:end;min-height:40px;padding:0 16px;font-size:13px;font-weight:800;order:3}
+          .lp-hero{padding:80px 20px 36px}
           .lp-hero-logo{width:min(100%,320px);max-width:calc(100vw - 32px)}
           .lp-sec,.lp-how-inner,.lp-faq-inner,.lp-nums-wrap,.lp-cta-wrap{padding-inline:20px}
           .lp-fg{grid-template-columns:1fr}
@@ -957,7 +961,7 @@ export function LandingPage() {
         <div className="lp-sec-eye">{content.sections.testimonialsEye}</div>
         <h2 className="lp-sec-h">{content.sections.testimonialsTitle} <span className="lp-blue">{content.sections.testimonialsAccent}</span></h2>
         <div className="lp-tg">
-          {testimonials.map(({ name, role, text, stars }) => (
+          {testimonials.map(({ name, role, text, stars, date }) => (
             <div key={name} className="lp-tc">
               <div className="lp-tc-stars">{'★'.repeat(stars)}</div>
               <p className="lp-tc-text">"{text}"</p>
@@ -967,6 +971,10 @@ export function LandingPage() {
                   <div className="lp-tc-name">{name}</div>
                   <div className="lp-tc-role">{role}</div>
                 </div>
+              </div>
+              <div className="lp-tc-footer">
+                <span className="lp-tc-date">{date}</span>
+                <span className="lp-tc-verified">✓ {isAr ? 'مستخدم موثّق' : 'Verified user'}</span>
               </div>
             </div>
           ))}

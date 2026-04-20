@@ -71,7 +71,8 @@ export function useInvoices(filters?: { status?: string }) {
         )
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(300);
 
       if (filters?.status) q = q.eq('status', filters.status);
 

@@ -37,12 +37,14 @@ export function useAppointments(filters?: {
   search?: string;
   doctorId?: string;
   status?: string;
+  date?: string;
 }) {
   const clinicId = useAuthStore((s) => s.profile?.clinic_id);
 
   return useQuery({
     queryKey: ['appointments', clinicId, filters],
     enabled: !!clinicId,
+    staleTime: 3 * 60_000,
     queryFn: async () => {
       let q = db
         .from('appointments')
@@ -58,10 +60,13 @@ export function useAppointments(filters?: {
         .eq('clinic_id', clinicId!)
         .is('deleted_at', null)
         .order('start_time', { ascending: false })
-        .limit(1000);
+        .limit(300);
 
       if (filters?.doctorId) q = q.eq('doctor_ref_id', filters.doctorId);
       if (filters?.status) q = q.eq('status', filters.status);
+      if (filters?.date) {
+        q = q.gte('start_time', `${filters.date}T00:00:00`).lte('start_time', `${filters.date}T23:59:59`);
+      }
       if (filters?.search?.trim()) {
         q = q.or(`walk_in_name.ilike.%${filters.search}%`);
       }
