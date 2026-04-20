@@ -7,7 +7,7 @@ type Patient = Database['public']['Tables']['patients']['Row'];
 
 interface PatientSearchInputProps {
   value: string; // patient_id
-  onChange: (id: string) => void;
+  onChange: (id: string, name?: string) => void;
   isAr?: boolean;
   placeholder?: string;
   required?: boolean;
@@ -79,7 +79,7 @@ export function PatientSearchInput({
     setInputText('');
     setQuery('');
     setOpen(false);
-    onChange(patient.id);
+    onChange(patient.id, `${patient.first_name} ${patient.last_name}`.trim());
   }
 
   function handleClear() {
@@ -87,7 +87,7 @@ export function PatientSearchInput({
     setInputText('');
     setQuery('');
     setOpen(false);
-    onChange('');
+    onChange('', '');
   }
 
   async function handleQuickCreate() {

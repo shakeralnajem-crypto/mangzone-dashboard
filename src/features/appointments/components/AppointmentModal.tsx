@@ -49,6 +49,11 @@ export function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps)
     status: (appointment?.status ?? 'SCHEDULED') as ApptStatus,
     notes: appointment?.notes ?? '',
   });
+  const [selectedPatientName, setSelectedPatientName] = useState(
+    appointment?.patient
+      ? `${appointment.patient.first_name} ${appointment.patient.last_name}`.trim()
+      : ''
+  );
   const [submitError, setSubmitError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{
     patient?: string; walkin?: string; date?: string; time?: string;
@@ -141,7 +146,7 @@ export function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps)
       }
 
       // Telegram notification (fire-and-forget)
-      const patientName = apptType === 'walkin' ? form.walk_in_name.trim() : '';
+      const patientName = apptType === 'walkin' ? form.walk_in_name.trim() : selectedPatientName;
       const serviceName = services.find(s => s.id === form.service_id)?.name ?? '';
       const doctorName  = doctors.find(d => d.id === form.doctor_ref_id)?.full_name ?? '';
       fetch('/api/notify-appointment', {
@@ -211,7 +216,7 @@ export function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps)
               <label className="ds-label">{t.patient}</label>
               <PatientSearchInput
                 value={form.patient_id ?? ''}
-                onChange={(id) => { setForm((f) => ({ ...f, patient_id: id })); setFieldErrors((prev) => ({ ...prev, patient: undefined })); }}
+                onChange={(id, name) => { setForm((f) => ({ ...f, patient_id: id })); setSelectedPatientName(name ?? ''); setFieldErrors((prev) => ({ ...prev, patient: undefined })); }}
                 isAr={isAr}
                 onQuickCreate={handleQuickCreatePatient}
                 quickCreateLoading={createPatient.isPending}
