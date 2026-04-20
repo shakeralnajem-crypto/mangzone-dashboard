@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `Team: ${teamSize || '-'}`,
       `Notes: ${notes || '-'}`,
     ].join(' | ');
-    const tgUrl = `https://api.callmebot.com/text.php?user=${encodeURIComponent(TELEGRAM_USER)}&text=${encodeURIComponent(msg)}`;
+    const tgUrl = `https://api.callmebot.com/text.php?user=${TELEGRAM_USER}&text=${encodeURIComponent(msg)}`;
     const tgRes = await fetch(tgUrl);
     const tgBody = await tgRes.text();
     results.telegram = tgRes.ok;
