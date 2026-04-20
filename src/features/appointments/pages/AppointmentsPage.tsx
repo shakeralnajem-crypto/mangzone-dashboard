@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Download, GitCompareArrows, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, Download, GitCompareArrows, Plus, X, Edit2, Trash2, MessageCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppointments, useUpdateAppointment, useDeleteAppointment } from '@/hooks/useAppointments';
 import { PatientDetailModal } from '@/components/shared/PatientDetailModal';
@@ -21,6 +21,14 @@ type Appointment = Database['public']['Tables']['appointments']['Row'];
 const STATUSES = [
   'SCHEDULED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW',
 ] as const;
+
+function buildWaReminderLink(phone: string, name: string, dateStr: string, isAr: boolean) {
+  const clean = phone.replace(/\D/g, '');
+  const msg = isAr
+    ? `مرحباً ${name}، نذكّرك بموعدك في عيادتنا يوم ${dateStr}. نتطلع لرؤيتك 🦷`
+    : `Hello ${name}, this is a reminder for your appointment on ${dateStr}. We look forward to seeing you 🦷`;
+  return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+}
 
 export function AppointmentsPage() {
   const { i18n } = useTranslation();
@@ -171,88 +179,164 @@ export function AppointmentsPage() {
           </button>
         </div>
       ) : (
-        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="ds-table-wrap">
-            <table className="ds-table">
-              <thead>
-                <tr>
-                  <th className="ds-th">{t.patient}</th>
-                  <th className="ds-th">{t.date} / {t.time}</th>
-                  <th className="ds-th mobile-hide">{t.service}</th>
-                  <th className="ds-th">{t.status}</th>
-                  <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {appointments.map((a) => {
-                  const initials = a.patient
-                    ? `${a.patient.first_name.charAt(0)}${a.patient.last_name.charAt(0)}`
-                    : (a.walk_in_name ?? 'W').slice(0, 2).toUpperCase();
-                  return (
-                    <tr key={a.id} className="ds-tbody-row">
-                      <td className="ds-td">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div className="ds-avatar" style={{ width: 36, height: 36, fontSize: 12, flexShrink: 0 }}>
-                            {initials}
-                          </div>
-                          <div>
-                            {a.patient ? (
-                              <button
-                                onClick={() => setDetailPatient(a.patient as typeof detailPatient)}
-                                style={{ fontSize: 13, fontWeight: 600, color: 'var(--p2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline'; }}
-                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.textDecoration = 'none'; }}
-                              >
-                                {`${a.patient.first_name} ${a.patient.last_name}`}
-                              </button>
-                            ) : (
-                              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{a.walk_in_name ?? '—'}</p>
-                            )}
-                            <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
-                              {a.patient ? (isAr ? 'مريض' : 'Patient') : (isAr ? 'زيارة مباشرة' : 'Walk-in')}
-                              {a.walk_in_phone ? ` · ${a.walk_in_phone}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="ds-td">
-                        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
-                          {new Date(a.start_time).toLocaleDateString('en-EG', { dateStyle: 'medium' })}
-                        </p>
-                        <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
-                          {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
-                        </p>
-                      </td>
-                      <td className="ds-td mobile-hide" style={{ color: 'var(--txt2)', fontSize: 13 }}>
-                        {a.service?.name ?? '—'}
-                      </td>
-                      <td className="ds-td">
-                        <StatusDropdown
-                          appointmentId={a.id}
-                          current={a.status ?? 'SCHEDULED'}
-                          isAr={isAr}
-                          onUpdate={handleStatusChange}
-                        />
-                      </td>
-                      <td className="ds-td">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                          <button data-testid={`appointment-edit-${a.id}`} onClick={() => openEdit(a)} className="ds-icon-btn" title={isAr ? 'تعديل' : 'Edit'}>
-                            <Edit2 size={14} />
-                          </button>
-                          {can('delete:appointment') && (
-                            <button data-testid={`appointment-delete-${a.id}`} onClick={() => handleDelete(a)} className="ds-icon-btn-err" title={isAr ? 'حذف' : 'Delete'}>
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile cards */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {appointments.map((a) => {
+              const initials = a.patient
+                ? `${a.patient.first_name.charAt(0)}${a.patient.last_name.charAt(0)}`
+                : (a.walk_in_name ?? 'W').slice(0, 2).toUpperCase();
+              return (
+                <div key={a.id} className="ds-card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div className="ds-avatar" style={{ width: 40, height: 40, fontSize: 13, flexShrink: 0 }}>{initials}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {a.patient ? (
+                        <button
+                          onClick={() => setDetailPatient(a.patient as typeof detailPatient)}
+                          style={{ fontSize: 14, fontWeight: 700, color: 'var(--p2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block' }}
+                        >
+                          {`${a.patient.first_name} ${a.patient.last_name}`}
+                        </button>
+                      ) : (
+                        <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{a.walk_in_name ?? '—'}</p>
+                      )}
+                      <p style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2 }}>
+                        {a.patient ? (isAr ? 'مريض' : 'Patient') : (isAr ? 'زيارة مباشرة' : 'Walk-in')}
+                        {a.service?.name ? ` · ${a.service.name}` : ''}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                        {new Date(a.start_time).toLocaleDateString('en-EG', { month: 'short', day: 'numeric' })}
+                      </p>
+                      <p style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2 }}>
+                        {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <StatusDropdown
+                      appointmentId={a.id}
+                      current={a.status ?? 'SCHEDULED'}
+                      isAr={isAr}
+                      onUpdate={handleStatusChange}
+                    />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {(() => {
+                        const phone = (a.patient as { phone?: string } | null)?.phone ?? a.walk_in_phone;
+                        const name = a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : (a.walk_in_name ?? '');
+                        const dateStr = new Date(a.start_time).toLocaleString(isAr ? 'ar-EG' : 'en-EG', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        return phone ? (
+                          <a href={buildWaReminderLink(phone, name, dateStr, isAr)} target="_blank" rel="noopener noreferrer"
+                            className="ds-icon-btn" title={isAr ? 'تذكير واتساب' : 'WhatsApp reminder'}
+                            style={{ color: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <MessageCircle size={15} />
+                          </a>
+                        ) : null;
+                      })()}
+                      <button onClick={() => openEdit(a)} className="ds-icon-btn" title={isAr ? 'تعديل' : 'Edit'}>
+                        <Edit2 size={15} />
+                      </button>
+                      {can('delete:appointment') && (
+                        <button onClick={() => handleDelete(a)} className="ds-icon-btn-err" title={isAr ? 'حذف' : 'Delete'}>
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+
+          {/* Desktop table */}
+          <div className="ds-card hidden md:block" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="ds-table-wrap">
+              <table className="ds-table">
+                <thead>
+                  <tr>
+                    <th className="ds-th">{t.patient}</th>
+                    <th className="ds-th">{t.date} / {t.time}</th>
+                    <th className="ds-th">{t.service}</th>
+                    <th className="ds-th">{t.status}</th>
+                    <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.map((a) => {
+                    const initials = a.patient
+                      ? `${a.patient.first_name.charAt(0)}${a.patient.last_name.charAt(0)}`
+                      : (a.walk_in_name ?? 'W').slice(0, 2).toUpperCase();
+                    return (
+                      <tr key={a.id} className="ds-tbody-row">
+                        <td className="ds-td">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div className="ds-avatar" style={{ width: 36, height: 36, fontSize: 12, flexShrink: 0 }}>{initials}</div>
+                            <div>
+                              {a.patient ? (
+                                <button
+                                  onClick={() => setDetailPatient(a.patient as typeof detailPatient)}
+                                  style={{ fontSize: 13, fontWeight: 600, color: 'var(--p2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline'; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.textDecoration = 'none'; }}
+                                >
+                                  {`${a.patient.first_name} ${a.patient.last_name}`}
+                                </button>
+                              ) : (
+                                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{a.walk_in_name ?? '—'}</p>
+                              )}
+                              <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
+                                {a.patient ? (isAr ? 'مريض' : 'Patient') : (isAr ? 'زيارة مباشرة' : 'Walk-in')}
+                                {a.walk_in_phone ? ` · ${a.walk_in_phone}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="ds-td">
+                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>
+                            {new Date(a.start_time).toLocaleDateString('en-EG', { dateStyle: 'medium' })}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'var(--txt3)' }}>
+                            {new Date(a.start_time).toLocaleTimeString('en-EG', { timeStyle: 'short' })}
+                          </p>
+                        </td>
+                        <td className="ds-td" style={{ color: 'var(--txt2)', fontSize: 13 }}>{a.service?.name ?? '—'}</td>
+                        <td className="ds-td">
+                          <StatusDropdown appointmentId={a.id} current={a.status ?? 'SCHEDULED'} isAr={isAr} onUpdate={handleStatusChange} />
+                        </td>
+                        <td className="ds-td">
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                            {(() => {
+                              const phone = (a.patient as { phone?: string } | null)?.phone ?? a.walk_in_phone;
+                              const name = a.patient ? `${a.patient.first_name} ${a.patient.last_name}` : (a.walk_in_name ?? '');
+                              const dateStr = new Date(a.start_time).toLocaleString(isAr ? 'ar-EG' : 'en-EG', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                              return phone ? (
+                                <a href={buildWaReminderLink(phone, name, dateStr, isAr)} target="_blank" rel="noopener noreferrer"
+                                  className="ds-icon-btn" title={isAr ? 'تذكير واتساب' : 'WhatsApp reminder'}
+                                  style={{ color: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <MessageCircle size={14} />
+                                </a>
+                              ) : null;
+                            })()}
+                            <button data-testid={`appointment-edit-${a.id}`} onClick={() => openEdit(a)} className="ds-icon-btn" title={isAr ? 'تعديل' : 'Edit'}>
+                              <Edit2 size={14} />
+                            </button>
+                            {can('delete:appointment') && (
+                              <button data-testid={`appointment-delete-${a.id}`} onClick={() => handleDelete(a)} className="ds-icon-btn-err" title={isAr ? 'حذف' : 'Delete'}>
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {modalOpen && <AppointmentModal appointment={editingAppt} isAr={isAr} onClose={closeModal} />}
