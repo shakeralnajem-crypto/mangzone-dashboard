@@ -6,7 +6,7 @@ import { useTodayAppointments } from '@/hooks/useAppointments';
 import { useOverdueLeads } from '@/hooks/useLeads';
 import { useBillingStats } from '@/hooks/useInvoices';
 import { formatEGP } from '@/lib/currency';
-import { Users, CalendarDays, ReceiptText, TrendingUp, AlertCircle, Megaphone } from 'lucide-react';
+import { Users, CalendarDays, ReceiptText, TrendingUp, AlertCircle, Megaphone, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useT, getStatusLabel } from '@/lib/translations';
 
@@ -31,8 +31,8 @@ const GRADIENTS = [
   'linear-gradient(135deg,#7C3AED,#8B5CF6)',
 ];
 
-const BAR_H = ['35%','55%','42%','78%','62%','88%','70%'];
-const DAY_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_LABELS_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_LABELS_AR = ['أحد','إثن','ثلا','أرب','خمس','جمع','سبت'];
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -56,8 +56,19 @@ export function DashboardPage() {
   const { data: leads = [] } = useOverdueLeads();
   const { data: billing } = useBillingStats();
 
-  const todayIdx = new Date().getDay();
   const greeting = `${t.welcomeBack}, ${profile?.full_name ?? ''}`;
+
+  // Weekly revenue bar heights from real data
+  const weeklyRevenue = billing?.weeklyRevenue ?? [];
+  const maxWeekly = Math.max(...weeklyRevenue, 1);
+  const DAY_LABELS = isAr ? DAY_LABELS_AR : DAY_LABELS_EN;
+
+  // Last 7 day labels (Sun-Sat order shifted to current week)
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.getDay();
+  });
 
   // ── Visibility flags ────────────────────────────────────────────────────────
   const showAppointments = canPage('/appointments');
@@ -75,7 +86,7 @@ export function DashboardPage() {
       label: t.totalPatients,
       val: stats?.totalPatients,
       sub: isAr ? 'مريض مسجل' : 'Registered',
-      delay: '0.05s',
+      delay: '0.05s', path: '/patients',
     },
     {
       show: showAppointments,
@@ -84,7 +95,7 @@ export function DashboardPage() {
       label: t.todayAppts,
       val: stats?.todayAppointments,
       sub: isAr ? 'مجدول' : 'Scheduled',
-      delay: '0.10s',
+      delay: '0.10s', path: '/appointments',
     },
     {
       show: showBilling,
@@ -93,7 +104,7 @@ export function DashboardPage() {
       label: t.monthRevenue,
       val: stats ? formatEGP(stats.monthlyRevenue) : undefined,
       sub: isAr ? 'هذا الشهر' : 'This month',
-      delay: '0.15s',
+      delay: '0.15s', path: '/accounting',
     },
     {
       show: showBilling,
@@ -102,7 +113,7 @@ export function DashboardPage() {
       label: t.unpaidInvoices,
       val: stats?.unpaidInvoices,
       sub: isAr ? 'معلقة' : 'Pending',
-      delay: '0.20s',
+      delay: '0.20s', path: '/billing',
     },
     {
       show: showLeads,
@@ -111,7 +122,7 @@ export function DashboardPage() {
       label: t.newLeads,
       val: stats?.newLeads,
       sub: isAr ? 'جديد' : 'New',
-      delay: '0.25s',
+      delay: '0.25s', path: '/leads',
     },
     {
       show: showAppointments,
@@ -120,7 +131,7 @@ export function DashboardPage() {
       label: t.cancelledToday,
       val: stats?.cancelledToday,
       sub: isAr ? 'ملغي' : 'Cancelled',
-      delay: '0.30s',
+      delay: '0.30s', path: '/appointments',
     },
   ];
   const kpis = allKpis.filter(k => k.show);
@@ -152,8 +163,15 @@ export function DashboardPage() {
       {/* KPI Grid — auto-fill collapses on small screens */}
       {kpis.length > 0 && (
         <div className="stats-grid">
-          {kpis.map(({ color, iconBg, iconClr, Icon, label, val, sub, delay }) => (
-            <div key={label} className={`ds-stat ${color}`} style={{ animationDelay: delay }}>
+          {kpis.map(({ color, iconBg, iconClr, Icon, label, val, sub, delay, path }) => (
+            <div
+              key={label}
+              className={`ds-stat ${color}`}
+              style={{ animationDelay: delay, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+              onClick={() => navigate(path)}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; }}
+            >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                 <p className="ds-stat-label">{label}</p>
                 <div className="ds-stat-icon" style={{ background: iconBg }}>
@@ -168,6 +186,24 @@ export function DashboardPage() {
               <div style={{ fontSize: 11.5, color: 'var(--txt3)', fontWeight: 600 }}>{sub}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pending payments alert */}
+      {showBilling && billing && billing.pendingAmount > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderRadius: 16, background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.25)', cursor: 'pointer' }}
+          onClick={() => navigate('/billing')}>
+          <ReceiptText size={20} style={{ color: '#D97706', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt)' }}>
+              {isAr ? 'مبالغ معلقة: ' : 'Pending payments: '}
+              <span style={{ color: '#D97706' }}>{formatEGP(billing.pendingAmount)}</span>
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--txt3)', marginInlineStart: 8 }}>
+              {stats?.unpaidInvoices ?? 0} {isAr ? 'فاتورة غير مدفوعة' : 'unpaid invoices'}
+            </span>
+          </div>
+          <ArrowRight size={16} style={{ color: 'var(--txt3)', flexShrink: 0 }} />
         </div>
       )}
 
@@ -261,15 +297,20 @@ export function DashboardPage() {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 80, padding: '14px 18px 0' }}>
-                {BAR_H.map((h, i) => (
-                  <div key={i} style={{ flex: 1, height: h, borderRadius: '6px 6px 0 0', background: i === todayIdx ? 'linear-gradient(to bottom,#8B5CF6,#6D28D9)' : 'var(--p-soft)', border: '1px solid var(--brd)', transition: 'all 0.3s', cursor: 'pointer' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--p-glow)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = i === todayIdx ? 'linear-gradient(to bottom,#8B5CF6,#6D28D9)' : 'var(--p-soft)'; }} />
-                ))}
+                {Array.from({ length: 7 }, (_, i) => {
+                  const amt = weeklyRevenue[i] ?? 0;
+                  const h = Math.max(8, Math.round((amt / maxWeekly) * 72));
+                  const isToday = i === 6;
+                  return (
+                    <div key={i} title={formatEGP(amt)} style={{ flex: 1, height: h, borderRadius: '6px 6px 0 0', background: isToday ? 'linear-gradient(to bottom,#8B5CF6,#6D28D9)' : amt > 0 ? 'var(--p-soft)' : 'var(--bg3)', border: '1px solid var(--brd)', transition: 'all 0.3s', cursor: 'pointer' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--p-glow)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isToday ? 'linear-gradient(to bottom,#8B5CF6,#6D28D9)' : amt > 0 ? 'var(--p-soft)' : 'var(--bg3)'; }} />
+                  );
+                })}
               </div>
               <div style={{ display: 'flex', gap: 5, padding: '4px 18px 12px' }}>
-                {DAY_LABELS.map((d, i) => (
-                  <div key={d} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: i === todayIdx ? 'var(--p2)' : 'var(--txt3)', fontWeight: i === todayIdx ? 800 : 500 }}>{d}</div>
+                {last7Days.map((dayIdx, i) => (
+                  <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: i === 6 ? 'var(--p2)' : 'var(--txt3)', fontWeight: i === 6 ? 800 : 500 }}>{DAY_LABELS[dayIdx]}</div>
                 ))}
               </div>
             </div>

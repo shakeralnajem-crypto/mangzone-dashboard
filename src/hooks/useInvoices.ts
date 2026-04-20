@@ -143,7 +143,17 @@ export function useBillingStats() {
         .reduce((s, i) => s + i.balance_due, 0);
       const totalInvoices = invoices.length;
 
-      return { todayRevenue, monthRevenue, pendingAmount, totalInvoices };
+      // Last 7 days daily revenue
+      const weeklyRevenue: number[] = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - (6 - i));
+        const dateStr = d.toISOString().slice(0, 10);
+        return payments
+          .filter((p) => p.payment_date.slice(0, 10) === dateStr)
+          .reduce((s, p) => s + p.amount, 0);
+      });
+
+      return { todayRevenue, monthRevenue, pendingAmount, totalInvoices, weeklyRevenue };
     },
   });
 }
