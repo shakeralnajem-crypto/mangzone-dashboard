@@ -294,14 +294,19 @@ export function LandingPage() {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
   const [dark, setDark] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [navHeight, setNavHeight] = useState(152);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [formData, setFormData] = useState<LandingFormState>({
     fullName: '',
-    phone: '01',
+    phone: '',
     clinicName: '',
     teamSize: '',
     notes: '',
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
   const barsRef = useRef<HTMLDivElement>(null);
   const language: LandingLanguage = (i18n.resolvedLanguage ?? i18n.language ?? 'ar').startsWith('ar') ? 'ar' : 'en';
   const isAr = language === 'ar';
@@ -325,19 +330,23 @@ export function LandingPage() {
     setFormData((current) => ({ ...current, [field]: event.target.value }));
   };
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const digitsOnly = event.target.value.replace(/\D/g, '');
-    let nextValue = digitsOnly;
-
-    if (!nextValue.startsWith('01')) {
-      nextValue = `01${nextValue.replace(/^0+/, '')}`;
-    }
-
-    if (nextValue.length < 2) nextValue = '01';
-
-    setFormData((current) => ({ ...current, phone: nextValue.slice(0, 11) }));
+    setFormData((current) => ({ ...current, phone: event.target.value }));
   };
   const handleLeadSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    fetch('/api/lead-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    })
+      .catch(() => null)
+      .finally(() => {
+        setSubmitting(false);
+        setSubmitted(true);
+        setFormData({ fullName: '', phone: '01', clinicName: '', teamSize: '', notes: '' });
+      });
   };
 
   // Reveal animations
@@ -393,6 +402,16 @@ export function LandingPage() {
     return () => obs.disconnect();
   }, []);
 
+  useEffect(() => {
+    const measure = () => {
+      const nav = navRef.current;
+      if (nav) setNavHeight(nav.getBoundingClientRect().bottom + 16);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
   // Revenue bars
   useEffect(() => {
     const bel = barsRef.current;
@@ -434,7 +453,7 @@ export function LandingPage() {
   const landingLogoSrc = dark ? '/logo-dark.svg' : '/logo.svg';
 
   return (
-    <div dir={isAr ? 'rtl' : 'ltr'} data-lp={th} style={{ fontFamily: 'var(--font-arabic)', background: dark ? '#0d1117' : '#fff', color: dark ? '#f0f6fc' : '#060b1a', minHeight: '100vh', overflowX: 'hidden' }}>
+    <div dir="ltr" data-lp={th} data-lang={isAr ? 'ar' : 'en'} style={{ fontFamily: 'var(--font-arabic)', background: dark ? '#0d1117' : '#fff', color: dark ? '#f0f6fc' : '#060b1a', minHeight: '100vh', overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Cairo:wght@300;400;600;700;900&display=swap');
         *,*::before,*::after{box-sizing:border-box}
@@ -452,7 +471,7 @@ export function LandingPage() {
         .lpnav-links{display:flex;align-items:center;justify-content:center;gap:10px;padding:5px 10px;border-radius:999px;background:var(--nav-menu-bg);border:1px solid var(--nav-menu-border);box-shadow:var(--nav-menu-shadow)}
         .lpnl{min-height:34px;padding:0 11px;border-radius:999px;border:1px solid var(--nav-pill-border);background:var(--nav-pill-bg);color:var(--txt2);cursor:pointer;font-family:var(--font-arabic);font-size:11px;font-weight:600;line-height:1;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.02);transition:transform .24s cubic-bezier(.16,1,.3,1),background .24s cubic-bezier(.16,1,.3,1),color .24s cubic-bezier(.16,1,.3,1),border-color .24s cubic-bezier(.16,1,.3,1),box-shadow .24s cubic-bezier(.16,1,.3,1)}
         .lpnl:hover{color:var(--txt);background:var(--nav-pill-hover);border-color:var(--nav-pill-hover-border);box-shadow:var(--nav-pill-shadow);transform:translateY(-1.5px)}
-        [dir="rtl"] .lpnl{font-size:21px;min-height:44px;padding:0 16px}
+        [data-lang="ar"] .lpnl{font-size:21px;min-height:44px;padding:0 16px}
         .lpnav-right{grid-area:actions;justify-self:start;display:flex;align-items:center;gap:10px;direction:rtl}
         .lp-nav-mini{height:46px;border-radius:999px;border:1px solid color-mix(in srgb,var(--nav-shell-border) 82%,transparent);background:var(--nav-theme-bg);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--nav-theme-shadow);transition:transform .24s cubic-bezier(.16,1,.3,1),background .24s cubic-bezier(.16,1,.3,1),border-color .24s cubic-bezier(.16,1,.3,1),box-shadow .24s cubic-bezier(.16,1,.3,1)}
         .lp-nav-mini:hover{transform:translateY(-1.5px);border-color:color-mix(in srgb,var(--blue) 24%,var(--nav-shell-border));background:color-mix(in srgb,var(--blue3) 68%,var(--bg2));box-shadow:var(--nav-pill-shadow)}
@@ -638,18 +657,36 @@ export function LandingPage() {
         .lpr{opacity:0;transform:translateY(32px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
         .lpv{opacity:1!important;transform:none!important}
 
+        /* HAMBURGER */
+        .lp-hamburger{display:none;width:44px;height:44px;border-radius:999px;border:1px solid color-mix(in srgb,var(--nav-shell-border) 82%,transparent);background:var(--nav-theme-bg);cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--nav-theme-shadow);transition:transform .24s cubic-bezier(.16,1,.3,1),background .24s,border-color .24s;flex-direction:column;gap:5px;padding:0}
+        .lp-hamburger:hover{transform:translateY(-1.5px);background:color-mix(in srgb,var(--blue3) 68%,var(--bg2));border-color:color-mix(in srgb,var(--blue) 24%,var(--nav-shell-border))}
+        .lp-hamburger span{display:block;width:18px;height:2px;background:var(--txt2);border-radius:2px;transition:transform .3s,opacity .3s}
+        .lp-hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+        .lp-hamburger.open span:nth-child(2){opacity:0}
+        .lp-hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        /* MOBILE MENU OVERLAY */
+        .lp-mobile-menu{display:none;position:fixed;inset:0;z-index:199;padding-top:152px;padding-inline:16px;padding-bottom:32px;background:var(--bg);overflow-y:auto;transform:translateY(-100%);opacity:0;transition:transform .38s cubic-bezier(.16,1,.3,1),opacity .28s;pointer-events:none;display:flex;flex-direction:column}
+        .lp-mobile-menu.open{transform:translateY(0);opacity:1;pointer-events:auto}
+        .lp-mm-links{display:flex;flex-direction:column;gap:6px;flex:1}
+        .lp-mm-link{width:100%;min-height:54px;padding:0 22px;border-radius:16px;border:1px solid var(--brd);background:var(--card);color:var(--txt);cursor:pointer;font-family:var(--font-arabic);font-size:16px;font-weight:600;text-align:start;transition:background .2s,border-color .2s,color .2s;display:flex;align-items:center}
+        .lp-mm-link:active{background:var(--blue3);border-color:color-mix(in srgb,var(--blue) 30%,transparent);color:var(--blue)}
+        .lp-mm-divider{height:1px;background:var(--brd);margin:auto 0 8px}
+        .lp-mm-footer{display:flex;gap:8px}
+        .lp-mm-footer-btn{flex:1;min-height:46px;border-radius:14px;border:1px solid var(--brd);background:var(--card);color:var(--txt2);cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .2s,border-color .2s,color .2s}
+        .lp-mm-footer-btn:active{background:var(--blue3);border-color:color-mix(in srgb,var(--blue) 30%,transparent);color:var(--blue)}
+
         @media(max-width:900px){
+          .lp-hamburger{display:flex}
+          .lp-mobile-menu{display:block}
           .lpnav{top:12px;padding-inline:12px}
-          .lpnav-shell{min-height:76px;padding:12px 14px;grid-template-columns:minmax(138px,1fr) auto;grid-template-areas:"brand actions";gap:12px}
+          .lpnav-shell{min-height:68px;padding:10px 14px;grid-template-columns:auto 1fr auto;grid-template-areas:"hamburger brand cta";gap:10px;align-items:center}
           .lpnav-menu{display:none}
+          .lpnav-right{display:contents}
+          .lp-nav-mini{display:none}
+          .lp-hamburger{display:flex;grid-area:hamburger;justify-self:start;order:1}
+          .lpnav-brand{grid-area:brand;justify-self:center;width:clamp(130px,34vw,165px);max-width:50vw;order:2;transform:translateX(20px)}
+          .lpncta{grid-area:cta;justify-self:end;min-height:36px;padding:0 12px;font-size:12px;order:3}
           .lp-hero{padding:100px 20px 40px}
-          .lpnav-brand{width:clamp(128px,34vw,160px);max-width:52vw}
-          .lplogo{padding:8px 10px}
-          .lpnav-right{gap:10px}
-          .lp-nav-mini{height:44px}
-          .lp-theme-btn{width:44px}
-          .lp-lang-btn{min-width:54px;padding:0 14px;font-size:11px}
-          .lpncta{min-height:46px;padding:0 20px;font-size:14px}
           .lp-hero-logo{width:min(100%,320px);max-width:calc(100vw - 32px)}
           .lp-sec,.lp-how-inner,.lp-faq-inner,.lp-nums-wrap,.lp-cta-wrap{padding-inline:20px}
           .lp-fg{grid-template-columns:1fr}
@@ -665,13 +702,39 @@ export function LandingPage() {
           .lp-onboard-inner{max-width:100%}
           .lp-onboard-head{margin-bottom:26px}
           .lp-onboard-title{font-size:clamp(34px,9vw,42px)}
-          .lp-onboard-desc{font-size:15px;line-height:1.9}
+          .lp-onboard-desc{font-size:16px;line-height:1.9}
           .lp-form-card{padding:34px 24px 28px}
+
+          /* Larger text on mobile for readability */
+          .lp-sec-eye{font-size:13px}
+          .lp-sec-h{letter-spacing:-0.5px;margin-bottom:36px}
+          .lp-fc{padding:28px 24px}
+          .lp-fc-t{font-size:18px}
+          .lp-fc-d{font-size:15px;line-height:1.8}
+          .lp-step{padding:26px 22px}
+          .lp-step-t{font-size:17px}
+          .lp-step-d{font-size:15px;line-height:1.8}
+          .lp-ni-n{font-size:48px}
+          .lp-ni-l{font-size:15px}
+          .lp-ni{padding:36px 16px}
+          .lp-tc{padding:26px 22px}
+          .lp-tc-text{font-size:15px;line-height:1.85}
+          .lp-tc-name{font-size:15px}
+          .lp-tc-role{font-size:13px}
+          .lp-rc{padding:24px 20px}
+          .lp-rt{font-size:17px}
+          .lp-rd{font-size:15px;line-height:1.75}
+          .lp-faq-q{font-size:16px;padding:18px 20px}
+          .lp-faq-a{font-size:15px;line-height:1.8;padding:0 20px 18px}
+          .lp-mtag{font-size:15px;padding:10px 20px}
+          .lp-cta-sub{font-size:16px}
+          .lp-cta-note{font-size:14px}
+          .lp-mm-link{font-size:17px;min-height:58px}
         }
       `}</style>
 
       {/* NAV */}
-      <nav id="lpnav" className="lpnav">
+      <nav id="lpnav" className="lpnav" ref={navRef}>
         <div id="lpnav-shell" className="lpnav-shell">
           <div className="lplogo lpnav-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <img className="lp-logo-img" src={landingLogoSrc} alt="MANGZONE" draggable={false} />
@@ -699,9 +762,47 @@ export function LandingPage() {
             <button className="lp-nav-mini lp-theme-btn" onClick={() => setDark((d) => !d)} title={dark ? content.themeLight : content.themeDark}>
               {dark ? '☀️' : '🌙'}
             </button>
+            <button
+              className={`lp-hamburger${mobileMenuOpen ? ' open' : ''}`}
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              aria-label="Toggle menu"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
           </div>
         </div>
       </nav>
+
+      {/* MOBILE MENU */}
+      <div className={`lp-mobile-menu${mobileMenuOpen ? ' open' : ''}`} dir="ltr" style={{ paddingTop: navHeight }}>
+        <div className="lp-mm-links">
+          {navItems.map(({ id, label }) => (
+            <button
+              key={id}
+              className="lp-mm-link"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setTimeout(() => id === 'request-form'
+                  ? document.getElementById('request-form')?.scrollIntoView({ behavior: 'smooth' })
+                  : scrollTo(id), 100);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+          <div className="lp-mm-divider" />
+          <div className="lp-mm-footer">
+            <button className="lp-mm-footer-btn" onClick={toggleLanguage}>
+              🌐 {languageToggleLabel}
+            </button>
+            <button className="lp-mm-footer-btn" onClick={() => setDark((d) => !d)}>
+              {dark ? '☀️' : '🌙'} {dark ? (isAr ? 'فاتح' : 'Light') : (isAr ? 'داكن' : 'Dark')}
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* HERO */}
       <section className="lp-hero">
@@ -982,7 +1083,9 @@ export function LandingPage() {
                 />
               </label>
 
-              <button className="lp-form-submit" type="submit">{content.form.submit}</button>
+              <button className="lp-form-submit" type="submit" disabled={submitting}>
+                {submitted ? (isAr ? '✓ تم الإرسال بنجاح!' : '✓ Sent successfully!') : submitting ? (isAr ? 'جاري الإرسال...' : 'Sending...') : content.form.submit}
+              </button>
             </form>
 
             <p className="lp-form-trust">{content.form.trust}</p>
