@@ -381,55 +381,90 @@ export function ContentPage() {
           <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{t.noPostsFound}</p>
         </div>
       ) : (
-        <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="ds-table">
-            <thead>
-              <tr>
-                <th className="ds-th">{isAr ? 'العنوان' : 'Title'}</th>
-                <th className="ds-th">{t.platform}</th>
-                <th className="ds-th">{t.type}</th>
-                <th className="ds-th">{t.status}</th>
-                <th className="ds-th">{t.scheduledDate}</th>
-                <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {posts.map(post => (
-                <tr key={post.id} className="ds-tbody-row">
-                  <td className="ds-td">
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{post.title}</p>
+        <>
+          {/* Desktop table */}
+          <div className="ds-card hidden md:block" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="ds-table">
+              <thead>
+                <tr>
+                  <th className="ds-th">{isAr ? 'العنوان' : 'Title'}</th>
+                  <th className="ds-th">{t.platform}</th>
+                  <th className="ds-th">{t.type}</th>
+                  <th className="ds-th">{t.status}</th>
+                  <th className="ds-th">{t.scheduledDate}</th>
+                  <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {posts.map(post => (
+                  <tr key={post.id} className="ds-tbody-row">
+                    <td className="ds-td">
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{post.title}</p>
+                      {post.caption && (
+                        <p style={{ fontSize: 11, color: 'var(--txt3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {post.caption}
+                        </p>
+                      )}
+                    </td>
+                    <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt2)' }}>
+                      {PLATFORM_LABELS[post.platform][isAr ? 'ar' : 'en']}
+                    </td>
+                    <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt2)' }}>
+                      {POST_TYPE_LABELS[post.post_type][isAr ? 'ar' : 'en']}
+                    </td>
+                    <td className="ds-td">
+                      <span className={STATUS_CLS[post.status]}>{getStatusLabel(post.status, isAr)}</span>
+                    </td>
+                    <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>
+                      {post.scheduled_date ?? '—'}
+                    </td>
+                    <td className="ds-td">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                        {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
+                        <button onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
+                        {can('delete:content') && (
+                          <button onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Mobile cards */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {posts.map(post => (
+              <div key={post.id} className="ds-card" style={{ padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)', marginBottom: 2 }}>{post.title}</p>
                     {post.caption && (
-                      <p style={{ fontSize: 11, color: 'var(--txt3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p style={{ fontSize: 12, color: 'var(--txt3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {post.caption}
                       </p>
                     )}
-                  </td>
-                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt2)' }}>
-                    {PLATFORM_LABELS[post.platform][isAr ? 'ar' : 'en']}
-                  </td>
-                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt2)' }}>
-                    {POST_TYPE_LABELS[post.post_type][isAr ? 'ar' : 'en']}
-                  </td>
-                  <td className="ds-td">
-                    <span className={STATUS_CLS[post.status]}>{getStatusLabel(post.status, isAr)}</span>
-                  </td>
-                  <td className="ds-td" style={{ fontSize: 12, color: 'var(--txt3)' }}>
-                    {post.scheduled_date ?? '—'}
-                  </td>
-                  <td className="ds-td">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                      {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
-                      <button onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={13} /></button>
-                      {can('delete:content') && (
-                        <button onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    {post.caption && <CopyButton text={`${post.caption}\n\n${post.hashtags ?? ''}`} isAr={isAr} />}
+                    <button type="button" title="Edit" onClick={() => openEdit(post)} className="ds-icon-btn"><Edit2 size={14} /></button>
+                    {can('delete:content') && (
+                      <button type="button" title="Delete" onClick={() => handleDelete(post)} className="ds-icon-btn-err"><Trash2 size={14} /></button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                  <span className={STATUS_CLS[post.status]}>{getStatusLabel(post.status, isAr)}</span>
+                  <span className="ds-badge ds-badge-neutral">{PLATFORM_LABELS[post.platform][isAr ? 'ar' : 'en']}</span>
+                  <span className="ds-badge ds-badge-neutral">{POST_TYPE_LABELS[post.post_type][isAr ? 'ar' : 'en']}</span>
+                  {post.scheduled_date && (
+                    <span style={{ fontSize: 11, color: 'var(--txt3)' }}>{post.scheduled_date}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {modalOpen && (

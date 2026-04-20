@@ -433,52 +433,85 @@ export function StaffPage() {
                 <p style={{ fontSize: 14, color: 'var(--txt3)' }}>{isAr ? 'لم يتم إضافة موظفين بعد.' : 'No staff members added yet.'}</p>
               </div>
             ) : (
-              <div className="ds-card" style={{ padding: 0, overflow: 'hidden' }}>
-                <table className="ds-table">
-                  <thead>
-                    <tr>
-                      <th className="ds-th">{t.name}</th>
-                      <th className="ds-th">{t.phone}</th>
-                      <th className="ds-th">{t.role}</th>
-                      <th className="ds-th">{t.status}</th>
-                      <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {clinicStaff.map((m) => (
-                      <tr key={m.id} className="ds-tbody-row">
-                        <td className="ds-td">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div className="ds-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
-                              {m.full_name.split(' ').slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase()}
-                            </div>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{m.full_name}</span>
-                          </div>
-                        </td>
-                        <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{m.phone ?? '—'}</td>
-                        <td className="ds-td">
-                          <span className={ROLE_CLS[m.role] ?? 'ds-badge ds-badge-neutral'}>
-                            {isAr ? (ROLE_LABEL_AR[m.role] ?? m.role) : (ROLE_LABEL_EN[m.role] ?? m.role)}
-                          </span>
-                        </td>
-                        <td className="ds-td">
-                          <span className={m.is_active ? 'ds-badge ds-badge-ok' : 'ds-badge ds-badge-neutral'}>
-                            {m.is_active ? t.active : t.inactive}
-                          </span>
-                        </td>
-                        <td className="ds-td">
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                            <button onClick={() => setStaffModal(m)} className="ds-icon-btn"><Edit2 size={13} /></button>
-                            {can('delete:staff') && (
-                              <button onClick={() => handleDeleteMember(m)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
-                            )}
-                          </div>
-                        </td>
+              <>
+                {/* Desktop table */}
+                <div className="ds-card hidden md:block" style={{ padding: 0, overflow: 'hidden' }}>
+                  <table className="ds-table">
+                    <thead>
+                      <tr>
+                        <th className="ds-th">{t.name}</th>
+                        <th className="ds-th">{t.phone}</th>
+                        <th className="ds-th">{t.role}</th>
+                        <th className="ds-th">{t.status}</th>
+                        <th className="ds-th" style={{ textAlign: 'right' }}>{t.actions}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {clinicStaff.map((m) => (
+                        <tr key={m.id} className="ds-tbody-row">
+                          <td className="ds-td">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div className="ds-avatar" style={{ width: 32, height: 32, fontSize: 11, flexShrink: 0 }}>
+                                {m.full_name.split(' ').slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase()}
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--txt)' }}>{m.full_name}</span>
+                            </div>
+                          </td>
+                          <td className="ds-td" style={{ fontSize: 13, color: 'var(--txt2)' }}>{m.phone ?? '—'}</td>
+                          <td className="ds-td">
+                            <span className={ROLE_CLS[m.role] ?? 'ds-badge ds-badge-neutral'}>
+                              {isAr ? (ROLE_LABEL_AR[m.role] ?? m.role) : (ROLE_LABEL_EN[m.role] ?? m.role)}
+                            </span>
+                          </td>
+                          <td className="ds-td">
+                            <span className={m.is_active ? 'ds-badge ds-badge-ok' : 'ds-badge ds-badge-neutral'}>
+                              {m.is_active ? t.active : t.inactive}
+                            </span>
+                          </td>
+                          <td className="ds-td">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                              <button onClick={() => setStaffModal(m)} className="ds-icon-btn"><Edit2 size={13} /></button>
+                              {can('delete:staff') && (
+                                <button onClick={() => handleDeleteMember(m)} className="ds-icon-btn-err"><Trash2 size={13} /></button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="flex flex-col gap-3 md:hidden">
+                  {clinicStaff.map((m) => (
+                    <div key={m.id} className="ds-card" style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="ds-avatar" style={{ width: 40, height: 40, fontSize: 13, flexShrink: 0 }}>
+                          {m.full_name.split(' ').slice(0, 2).map(p => p.charAt(0)).join('').toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)' }}>{m.full_name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--txt3)', marginTop: 2 }}>{m.phone ?? '—'}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => setStaffModal(m)} className="ds-icon-btn"><Edit2 size={14} /></button>
+                          {can('delete:staff') && (
+                            <button onClick={() => handleDeleteMember(m)} className="ds-icon-btn-err"><Trash2 size={14} /></button>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <span className={ROLE_CLS[m.role] ?? 'ds-badge ds-badge-neutral'}>
+                          {isAr ? (ROLE_LABEL_AR[m.role] ?? m.role) : (ROLE_LABEL_EN[m.role] ?? m.role)}
+                        </span>
+                        <span className={m.is_active ? 'ds-badge ds-badge-ok' : 'ds-badge ds-badge-neutral'}>
+                          {m.is_active ? t.active : t.inactive}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
