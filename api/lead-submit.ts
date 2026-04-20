@@ -16,13 +16,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Telegram via CallMeBot
   try {
-    const text = encodeURIComponent(
-      `🦷 تسجيل جديد - Mangzone\n\n👤 الاسم: ${fullName}\n📞 الهاتف: ${phone}\n🏥 العيادة: ${clinicName || '-'}\n👥 حجم الفريق: ${teamSize || '-'}\n📝 ملاحظات: ${notes || '-'}`
-    );
-    const tgUrl = `https://api.callmebot.com/text.php?user=${TELEGRAM_USER}&text=${text}`;
+    const msg = [
+      'New Lead - Mangzone',
+      `Name: ${fullName}`,
+      `Phone: ${phone}`,
+      `Clinic: ${clinicName || '-'}`,
+      `Team: ${teamSize || '-'}`,
+      `Notes: ${notes || '-'}`,
+    ].join(' | ');
+    const tgUrl = `https://api.callmebot.com/text.php?user=${encodeURIComponent(TELEGRAM_USER)}&text=${encodeURIComponent(msg)}`;
     const tgRes = await fetch(tgUrl);
+    const tgBody = await tgRes.text();
     results.telegram = tgRes.ok;
-    if (!tgRes.ok) results.errors.push(`Telegram: ${tgRes.status}`);
+    if (!tgRes.ok) results.errors.push(`Telegram: ${tgRes.status} - ${tgBody}`);
+    else results.errors.push(`Telegram OK: ${tgBody}`);
   } catch (e) {
     results.errors.push(`Telegram: ${String(e)}`);
   }
