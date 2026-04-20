@@ -75,9 +75,15 @@ export function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps)
       setForm((f) => ({ ...f, patient_id: created.id }));
       setApptType('patient');
     } catch (err) {
-      const msg = err instanceof Error
-        ? err.message
-        : ((err as { message?: string })?.message ?? (isAr ? 'تعذر إنشاء المريض.' : 'Failed to create patient.'));
+      const raw = err instanceof Error ? err.message : ((err as { message?: string })?.message ?? '');
+      let msg = isAr ? 'تعذر إنشاء المريض.' : 'Failed to create patient.';
+      if (raw.includes('patients_clinic_phone_unique_idx') || raw.includes('unique') && raw.includes('phone')) {
+        msg = isAr
+          ? 'هذا الرقم مسجّل لمريض آخر. استخدم "مريض مسجّل" للبحث عنه.'
+          : 'This phone number belongs to an existing patient. Use "Registered Patient" to find them.';
+      } else if (raw) {
+        msg = raw;
+      }
       setSubmitError(msg);
     }
   };
@@ -154,9 +160,17 @@ export function AppointmentModal({ appointment, isAr, onClose }: ApptModalProps)
 
       onClose();
     } catch (err) {
-      const msg = err instanceof Error
-        ? err.message
-        : ((err as { message?: string })?.message ?? 'An error occurred.');
+      const raw = err instanceof Error ? err.message : ((err as { message?: string })?.message ?? '');
+      let msg = raw || (isAr ? 'حدث خطأ. حاول مرة أخرى.' : 'An error occurred. Please try again.');
+      if (raw.includes('patients_clinic_phone_unique_idx') || raw.includes('unique') && raw.includes('phone')) {
+        msg = isAr
+          ? 'هذا الرقم مسجّل لمريض آخر. استخدم "مريض مسجّل" للبحث عنه.'
+          : 'This phone number belongs to an existing patient. Use "Registered Patient" to find them.';
+      } else if (raw.includes('appointments_overlap') || raw.includes('overlap')) {
+        msg = isAr ? 'يوجد موعد آخر في نفس الوقت.' : 'Another appointment exists at the same time.';
+      } else if (raw.includes('foreign key') || raw.includes('fkey')) {
+        msg = isAr ? 'بيانات غير صحيحة. تحقق من الحقول وأعد المحاولة.' : 'Invalid data. Check the fields and try again.';
+      }
       setSubmitError(msg);
     }
   };
