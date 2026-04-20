@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const TELEGRAM_CHAT_ID = '6575119160';
+const TELEGRAM_USER = '@shaker_alnajem';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const text = encodeURIComponent(
       `🦷 تسجيل جديد - Mangzone\n\n👤 الاسم: ${fullName}\n📞 الهاتف: ${phone}\n🏥 العيادة: ${clinicName || '-'}\n👥 حجم الفريق: ${teamSize || '-'}\n📝 ملاحظات: ${notes || '-'}`
     );
-    const tgUrl = `https://api.callmebot.com/text.php?user=${TELEGRAM_CHAT_ID}&text=${text}`;
+    const tgUrl = `https://api.callmebot.com/text.php?user=${TELEGRAM_USER}&text=${text}`;
     const tgRes = await fetch(tgUrl);
     results.telegram = tgRes.ok;
     if (!tgRes.ok) results.errors.push(`Telegram: ${tgRes.status}`);
